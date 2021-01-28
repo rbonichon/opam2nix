@@ -17,7 +17,7 @@ type universe = {
     OpamVariable.Full.t ->
     OpamVariable.variable_contents option;
   repos : Repo.t list;
-  packages : (loaded_package, error) result OpamPackage.Map.t ref;
+  mutable packages : (loaded_package, error) result OpamPackage.Map.t;
   constrained_versions : Version.t Name.Map.t;
 }
 
@@ -89,7 +89,7 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
   {
     lookup_var;
     repos = external_constraints.repos;
-    packages = ref initial_packages;
+    packages = initial_packages;
     constrained_versions = Name.Map.of_list constrained_versions;
   }
 
@@ -112,7 +112,7 @@ let load_package ~url pkg : loaded_package =
                    Id "repoPath";
                    PropertyPath (Id "repos", [ pkg.repo.repo_key; "src" ]);
                    Attrs
-                     (AttrSet.build
+                     (AttrSet.of_list
                         [ ("package", str pkg.rel_path); ("hash", str digest) ]);
                  ]))
   in
@@ -161,7 +161,7 @@ module Context : Zi.S.CONTEXT with type t = universe = struct
       |> List.concat_map (fun repo -> Repo.list_package repo name_str)
       (* Drop duplicates from multiple repos *)
       |> List.filter (fun pkg ->
-             not (OpamPackage.Map.mem pkg.package !(env.packages)))
+             not (OpamPackage.Map.mem pkg.package env.packages))
       |> List.filter (fun pkg ->
              Name.Map.find_opt pkg.package.name env.constrained_versions
              |> Option.map (Version.equal pkg.package.version)
@@ -175,11 +175,11 @@ module Context : Zi.S.CONTEXT with type t = universe = struct
                       check_availability ~lookup_var:env.lookup_var pkg
                     in
                     let loaded = result |> Result.map (load_package ~url) in
-                    env.packages :=
-                      OpamPackage.Map.add pkg.package loaded !(env.packages)))
+                    env.packages <-
+                      OpamPackage.Map.add pkg.package loaded env.packages))
     in
 
-    OpamPackage.Map.bindings !(env.packages)
+    OpamPackage.Map.bindings env.packages
     |> List.filter_map (fun (k, v) ->
            if Name.equal (OpamPackage.name k) name then
              Some (k.version, v |> Result.map (fun loaded -> loaded.loaded_opam))
