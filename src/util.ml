@@ -145,7 +145,7 @@ let tap fn t =
 let getenv_opt name = try Some (Unix.getenv name) with Not_found -> None
 
 let () =
-  let envvar = getenv_opt "OPAM2NIX_VERBOSE" |> Option.default "" in
+  let envvar = getenv_opt "OPAM2NIX_VERBOSE" |> Option.value  ~default:"" in
   set_verbose (envvar = "1" || envvar = "true")
 
 module StringMap = struct

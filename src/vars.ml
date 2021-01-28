@@ -51,7 +51,7 @@ let path_var ~env ~prefix ~scope key =
     | "bin" | "sbin" | "man" | "libexec" | "etc" | "doc" | "share" -> Some key
     | "lib_root" | "share_root" ->
         scope := None;
-        without_trailing "_root" key |> Option.bind relpath
+        Option.bind (without_trailing "_root" key) relpath
     | _ -> None
   in
   relpath key
@@ -71,7 +71,7 @@ let package_var ~env =
   let installed = function Absent -> false | Provided | Installed _ -> true in
   let rec lookup ~pkg key =
     debug "(variable `%s` of package `%s`)\n" key (Name.to_string pkg);
-    let impl = Name.Map.find_opt pkg env.packages |> Option.default Absent in
+    let impl = Name.Map.find_opt pkg env.packages |> Option.value ~default:Absent in
     match key with
     | "installed" -> b (installed impl)
     | "enable" -> s (if installed impl then "enable" else "disable")
@@ -83,14 +83,14 @@ let package_var ~env =
             None
             (* all vars aside from `installed` are undefined if the package is absent *)
         | Installed { path; version } ->
-            path
-            |> Option.bind (fun path ->
+
+            Option.bind             path (fun path ->
                    path_var ~env ~prefix:path ~scope:(Some pkg) key)
             |> Option.or_else
                  ( match key with
                  | "dev" -> r_false
                  | "build-id" ->
-                     path |> Option.map string_of_dir |> Option.bind s
+                     path |> Option.map string_of_dir |> fun v -> Option.bind v s
                  (* nix paths are unique :) *)
                  (* test and doc are undocumented, but appear in the wild... *)
                  | "test" | "with-test" -> r_false
@@ -112,7 +112,7 @@ let package_var ~env =
                  | "version" ->
                      version
                      |> Option.map OpamPackage.Version.to_string
-                     |> Option.bind s
+                     |> fun v -> Option.bind v s
                  | "hash" | "depends" ->
                      (* no reasonable way to implement these, and no use cases reported *)
                      s "NOT_IMPLEMENTED_IN_OPAM2NIX"
@@ -156,8 +156,7 @@ let lookup env key =
                | _ ->
                    (* Try resolving remaining vars as scope-less directories,
                       * and then fallback to resolving a self-var. *)
-                   env.prefix
-                   |> Option.bind (fun prefix ->
+                   Option.bind env.prefix (fun prefix ->
                           path_var ~env ~prefix ~scope:None unqualified)
                    |> Option.or_else_fn (fun () ->
                           package_var ~pkg:env.self unqualified) ))

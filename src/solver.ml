@@ -61,7 +61,7 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
            let name = package.direct_name in
            let version =
              package.direct_version
-             |> Option.default (Version.of_string "development")
+             |> Option.value ~default:(Version.of_string "development")
            in
            ( OpamPackage.create name version,
              Ok
@@ -99,7 +99,7 @@ let load_package ~url pkg : loaded_package =
     |> Option.map (fun url ->
            Opam_metadata.nix_of_url ~cache url
            |> Lwt.map (Result.map Option.some))
-    |> Option.default (Lwt.return (Ok None))
+    |> Option.value ~default:(Lwt.return (Ok None))
   in
   let repository_expr () =
     Repo.nix_digest_of_path (Repo.full_path pkg)
@@ -166,7 +166,7 @@ module Context : Zi.S.CONTEXT with type t = universe = struct
              Name.Map.find_opt pkg.package.name env.constrained_versions
              |> Option.map (Version.equal pkg.package.version)
              (* OK if versions equal *)
-             |> Option.default true
+             |> Option.value ~default:true
              (* or if there is no constraint on the version *))
       |> List.iter (fun pkg ->
              check_url pkg

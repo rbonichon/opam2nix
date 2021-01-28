@@ -110,7 +110,7 @@ let native_system_vars () =
              OpamVariable.Full.Map.add
                (OpamVariable.Full.global name)
                value state)
-      |> Option.default state)
+      |> Option.value ~default:state)
     state system_variables
 
 let nixos_vars () =
@@ -129,7 +129,7 @@ let add_base_variables base_vars =
        (S (OpamVersion.to_string OpamVersion.current))
   |> add_global_var "pinned" (B false) (* probably ? *)
   |> add_global_var "jobs"
-       (S (getenv_opt "NIX_BUILD_CORES" |> Option.default "1"))
+       (S (getenv_opt "NIX_BUILD_CORES" |> Option.value ~default:"1"))
   |> add_global_var "enable-ocaml-beta-repository" (B false)
   (* With preinstalled packages suppose they can't write
      in the ocaml directory *)
@@ -288,7 +288,7 @@ let nix_of_url ~cache (url : url) :
                     `Call
                       [
                         `Lit "pkgs.fetchurl";
-                        `Attrs (AttrSet.build [ ("url", str src); digest ]);
+                        attrset [ ("url", str src); digest ];
                       ]))
 
 let unsafe_drvname_chars = Str.regexp "[^-_.0-9a-zA-Z]"
@@ -327,14 +327,13 @@ let add_opam_deps ~add_dep (opam : OPAM.t) =
   if depexts <> [] then add_dep Required (ExternalDependencies depexts)
 
 module InputMap = struct
-  include StringMap
+  include Nix_expr.AttrSet
 
   (* override `add` to keep the "most required" entry *)
   let add k v map =
-    let existing = try Some (find k map) with Not_found -> None in
-    match existing with
+    match find_opt k map with
     | Some existing when ImportanceOrd.more_important existing v -> map
-    | _ -> add k v map
+    | Some _ | None -> add k v map
 end
 
 type opam_src = [ `Dir of Nix_expr.t | `File of Nix_expr.t ]
@@ -387,14 +386,16 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
   in
 
   (* TODO: separate build-only deps from propagated *)
-  `Attrs
-    (AttrSet.build
-       ( [
-           ("pname", Nix_expr.str (drvname_safe name));
-           ("version", Nix_expr.str (drvname_safe version));
-           ("src", src |> Option.default `Null);
-           ("opamInputs", `Attrs opam_inputs);
-           ( "opamSrc",
-             match opam_src with `Dir expr -> expr | `File expr -> expr );
-         ]
-       @ if nix_deps = [] then [] else [ ("buildInputs", `List nix_deps) ] ))
+  attrset
+    (let base =
+       [
+         ("pname", Nix_expr.str (drvname_safe name));
+         ("version", Nix_expr.str (drvname_safe version));
+         ("src", src |> Option.value  ~default:`Null);
+         ("opamInputs", `Attrs opam_inputs);
+         ("opamSrc", match opam_src with `Dir expr | `File expr -> expr);
+       ]
+     in
+     match nix_deps with
+     | [] -> base
+     | nix_deps -> ("buildInputs", `List nix_deps) :: base)

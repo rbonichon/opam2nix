@@ -104,7 +104,7 @@ let cache_of_json = function
            (fun map (key, value) ->
              value_of_json value
              |> Option.map (fun value -> Cache.add key value map)
-             |> Option.default map)
+             |> Option.value ~default:map)
            Cache.empty
   | _ -> failwith "Invalid JSON mapping; expected toplevel object"
 

@@ -1,10 +1,9 @@
-module AttrSet = struct
+module AttrSet  = struct
   include Map.Make (String)
 
-  let build pairs =
-    pairs |> List.fold_left (fun map (k, v) -> add k v map) empty
+  let build pairs = List.fold_left (fun map (k, v) -> add k v map) empty pairs 
 
-  let keys map = bindings map |> List.map (fun (a, _) -> a)
+  let keys map = bindings map |> List.map fst
 end
 
 type string_component = [ `Lit of string | `Expr of t ]
