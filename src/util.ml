@@ -1,7 +1,3 @@
-module Lwt = Lwt_ext
-
-let identity x = x
-
 let filter_map fn lst =
   lst
   |> List.fold_left
@@ -42,85 +38,6 @@ let rec rm_r root =
            if Sys.is_directory path then rm_r path else Unix.unlink path);
     Unix.rmdir root )
 
-let id x = x
-
-let nonempty value arg =
-  if value = "" then failwith (arg ^ " required") else value
-
-let nonempty_list value arg =
-  if value = [] then failwith (arg ^ " required") else value
-
-let rec drop n lst =
-  if n <= 0 then lst
-  else match lst with [] -> [] | _ :: tail -> drop (n - 1) tail
-
-let rec take n lst =
-  if n <= 0 then []
-  else match lst with [] -> [] | head :: tail -> head :: take (n - 1) tail
-
-let head_opt = function x :: _ -> Some x | [] -> None
-
-let tail = function [] -> [] | _ :: x -> x
-
-let group_by :
-      'item 'key. ('item -> 'key) -> 'item list -> ('key * 'item list) list =
- fun fn items ->
-  let finish key items_rev = (key, List.rev items_rev) in
-  let rec accum groups_rev current_key current_group_rev = function
-    | [] ->
-        (* end of inputs *)
-        ( if current_group_rev = [] then []
-        else [ finish current_key current_group_rev ] )
-        @ groups_rev
-    | head :: tail ->
-        let key = fn head in
-        if key = current_key then
-          accum groups_rev current_key (head :: current_group_rev) tail
-        else
-          let groups_rev = finish current_key current_group_rev :: groups_rev in
-          accum groups_rev key [ head ] tail
-  in
-  match items with
-  | [] -> []
-  | head :: tail ->
-      let key = fn head in
-      accum [] key [ head ] tail |> List.rev
-
-let fst = function a, _ -> a
-
-let snd = function _, b -> b
-
-let explode s =
-  let rec exp i l = if i < 0 then l else exp (i - 1) (s.[i] :: l) in
-  exp (String.length s - 1) []
-
-let string_of_char = String.make 1
-
-(* This is a bit ad-hoc.
- * We represent non-safe characters as +xNN, where NN is the hex representation.
- * Only supports ASCII. Literal +x is encoded (as +x2b+x78) *)
-let encode_nix_safe_path str =
-  let encode ch =
-    let a, b = Hex.of_char ch in
-    "+x" ^ string_of_char a ^ string_of_char b
-  in
-  let open Str in
-  full_split (regexp "[^.+_a-zA-Z0-9-]\\|\\+x") str
-  |> List.map (function
-       | Delim x when x = "+x" -> encode '+' ^ encode 'x'
-       | Delim x -> String.concat "" (List.map encode (explode x))
-       | Text x -> x)
-  |> String.concat ""
-
-let decode_nix_safe_path str =
-  let open Str in
-  let hex = "[0-9a-fA-F]" in
-  full_split (regexp ("\\+x" ^ hex ^ hex)) str
-  |> List.map (function
-       | Delim x -> Hex.to_char x.[2] x.[3] |> String.make 1
-       | Text x -> x)
-  |> String.concat ""
-
 module List = struct
   include List
 
@@ -138,9 +55,6 @@ let set_verbose v =
 let debug fmt =
   (if verbose () then Printf.eprintf else Printf.ifprintf stderr) fmt
 
-let tap fn t =
-  fn t;
-  t
 
 let getenv_opt name = try Some (Unix.getenv name) with Not_found -> None
 
@@ -148,13 +62,4 @@ let () =
   let envvar = getenv_opt "OPAM2NIX_VERBOSE" |> Option.value  ~default:"" in
   set_verbose (envvar = "1" || envvar = "true")
 
-module StringMap = struct
-  include Map.Make (String)
-
-  let singleton key value = add key value empty
-
-  let find_opt key map = try Some (find key map) with Not_found -> None
-
-  let from_list items =
-    List.fold_right (fun (k, v) map -> add k v map) items empty
-end
+module StringMap = Map.Make (String)

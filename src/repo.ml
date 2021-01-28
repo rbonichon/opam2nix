@@ -76,7 +76,7 @@ let list_package =
     let list_versions () =
       debug "listing %s\n" package_abs;
       let dirs =
-        try list_dirs package_abs
+        try Util.list_dirs package_abs
         with Sys_error e ->
           debug "Skipping (%s)\n" e;
           []

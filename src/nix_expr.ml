@@ -1,5 +1,5 @@
 module AttrSet  = struct
-  include Map.Make (String)
+  include Util.StringMap
 
   let build pairs = List.fold_left (fun map (k, v) -> add k v map) empty pairs 
 

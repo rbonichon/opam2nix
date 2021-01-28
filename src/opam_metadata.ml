@@ -129,7 +129,7 @@ let add_base_variables base_vars =
        (S (OpamVersion.to_string OpamVersion.current))
   |> add_global_var "pinned" (B false) (* probably ? *)
   |> add_global_var "jobs"
-       (S (getenv_opt "NIX_BUILD_CORES" |> Option.value ~default:"1"))
+       (S (Util.getenv_opt "NIX_BUILD_CORES" |> Option.value ~default:"1"))
   |> add_global_var "enable-ocaml-beta-repository" (B false)
   (* With preinstalled packages suppose they can't write
      in the ocaml directory *)
@@ -171,7 +171,7 @@ let add_nix_inputs ~(add_native : importance -> string -> unit)
       in
 
       let importance, deps =
-        let nixos_deps = filter_map (apply_filters nixos_env) externals in
+        let nixos_deps = Util.filter_map (apply_filters nixos_env) externals in
         if nixos_deps = [] then (
           debug
             "  Note: package has depexts, but none of them `nixos`:\n    %s\n"
@@ -359,7 +359,7 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
   let () = add_opam_deps ~add_dep opam in
 
   let url_ends_with ext =
-    match url with Some (`http (url, _)) -> ends_with ext url | None -> false
+    match url with Some (`http (url, _)) -> Util.ends_with ext url | None -> false
   in
 
   if url_ends_with ".zip" then add_native Required "unzip";
