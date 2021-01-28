@@ -237,10 +237,6 @@ let fixup_lib_dir ~dest env =
         Printf.eprintf "found! moving %s -> %s\n" incorrect_s expected_s;
         OpamFilename.move_dir ~src:incorrect_lib_dest ~dst:expected_lib_dest ) )
 
-let isdir path =
-  let open Unix in
-  try (stat path).st_kind = S_DIR with Unix_error (ENOENT, _, _) -> false
-
 let patch env =
   (* copy all files into ./ if present *)
   opam_file_path env.opam_src "files"
