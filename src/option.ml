@@ -6,9 +6,9 @@ let tap fn = function
       fn x;
       Some x
 
-let filter fn = function
+let filter p = function
   | None -> None
-  | Some x -> if fn x then Some x else None
+  | Some x -> if p x then Some x else None
 
 let may fn = function None -> () | Some x -> fn x
 
@@ -19,8 +19,6 @@ let or_else alt v = match v with Some _ -> v | None -> alt
 let or_else_fn alt v = match v with Some _ -> v | None -> alt ()
 
 let or_failwith msg v = match v with Some v -> v | None -> failwith msg
-
-let exists fn = function None -> false | Some v -> fn v
 
 let to_string fn = function None -> "None" | Some x -> "Some(" ^ fn x ^ ")"
 

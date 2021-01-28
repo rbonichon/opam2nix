@@ -41,7 +41,8 @@ let rec rm_r root =
 module List = struct
   include List
 
-  let to_string fn lst = "[" ^ String.concat ", " (map fn lst) ^ "]"
+  let to_string fn lst =
+    "[" ^ String.concat ", " (map fn lst) ^ "]"
 end
 
 let _verbose = ref false
@@ -54,7 +55,6 @@ let set_verbose v =
 
 let debug fmt =
   (if verbose () then Printf.eprintf else Printf.ifprintf stderr) fmt
-
 
 let getenv_opt name = try Some (Unix.getenv name) with Not_found -> None
 
