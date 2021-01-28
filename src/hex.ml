@@ -15,33 +15,29 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-type t = [`Hex of string]
+type t = [ `Hex of string ]
 
 let invalid_arg fmt =
   Printf.ksprintf (fun str -> raise (Invalid_argument str)) fmt
 
 let hexa = "0123456789abcdef"
+
 and hexa1 =
-  "0000000000000000111111111111111122222222222222223333333333333333\
-   4444444444444444555555555555555566666666666666667777777777777777\
-   88888888888888889999999999999999aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb\
-   ccccccccccccccccddddddddddddddddeeeeeeeeeeeeeeeeffffffffffffffff"
+  "0000000000000000111111111111111122222222222222223333333333333333444444444444444455555555555555556666666666666666777777777777777788888888888888889999999999999999aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbccccccccccccccccddddddddddddddddeeeeeeeeeeeeeeeeffffffffffffffff"
+
 and hexa2 =
-  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
-   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
-   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
-   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 let of_char c =
   let x = Char.code c in
-  hexa.[x lsr 4], hexa.[x land 0xf]
+  (hexa.[x lsr 4], hexa.[x land 0xf])
 
 let to_char x y =
-  let code c = match c with
-    | '0'..'9' -> Char.code c - 48 (* Char.code '0' *)
-    | 'A'..'F' -> Char.code c - 55 (* Char.code 'A' + 10 *)
-    | 'a'..'f' -> Char.code c - 87 (* Char.code 'a' + 10 *)
+  let code c =
+    match c with
+    | '0' .. '9' -> Char.code c - 48 (* Char.code '0' *)
+    | 'A' .. 'F' -> Char.code c - 55 (* Char.code 'A' + 10 *)
+    | 'a' .. 'f' -> Char.code c - 87 (* Char.code 'a' + 10 *)
     | _ -> invalid_arg "Hex.to_char: %d is an invalid char" (Char.code c)
   in
-  Char.chr (code x lsl 4 + code y)
-
+  Char.chr ((code x lsl 4) + code y)
