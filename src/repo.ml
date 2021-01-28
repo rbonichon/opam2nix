@@ -20,6 +20,8 @@ type t = {
   repo_digest : Digest_cache.nix_digest Lwt.t;
 }
 
+let repo_key {repo_key; _} = repo_key
+
 type package = {
   repo : t;
   rel_path : string;
@@ -54,7 +56,7 @@ let git_url spec =
   Printf.sprintf "https://github.com/%s/%s.git" spec.github_owner
     spec.github_name
 
-let package_desc pkg = OpamPackage.to_string pkg.package
+(* let package_desc pkg = OpamPackage.to_string pkg.package *)
 
 let load_url path =
   if Sys.file_exists path then (

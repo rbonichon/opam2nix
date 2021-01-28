@@ -110,7 +110,7 @@ let load_package ~url pkg : loaded_package =
                Call
                  [
                    Id "repoPath";
-                   PropertyPath (Id "repos", [ pkg.repo.repo_key; "src" ]);
+                   PropertyPath (Id "repos", [ repo_key pkg.repo; "src" ]);
                    Attrs
                      (AttrSet.of_list
                         [ ("package", str pkg.rel_path); ("hash", str digest) ]);

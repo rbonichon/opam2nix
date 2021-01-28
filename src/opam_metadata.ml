@@ -285,10 +285,10 @@ let nix_of_url ~cache (url : url) :
              digest
              |> Result.map (function `sha256 sha256 -> ("sha256", str sha256))
              |> Result.map (fun digest ->
-                    Call
+                    call
                       [
-                        Lit "pkgs.fetchurl";
-                        Attrs (attrset [ ("url", str src); digest ]);
+                        lit "pkgs.fetchurl";
+                        attrs [ ("url", str src); digest ];
                       ]))
 
 let unsafe_drvname_chars = Str.regexp "[^-_.0-9a-zA-Z]"
@@ -342,7 +342,6 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
     Nix_expr.t =
   let name = OpamPackage.name pkg |> OpamPackage.Name.to_string in
   let version = OpamPackage.version pkg |> OpamPackage.Version.to_string in
-  let open Nix_expr in
   let adder r importance name = r := InputMap.add name importance !r in
 
   deps#init_package pkg;
@@ -374,7 +373,7 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
     |> List.sort (fun (a, _) (b, _) -> String.compare a b)
   in
 
-  let opam_inputs : Nix_expr.t AttrSet.t =
+  let opam_inputs =
     !opam_inputs
     |> InputMap.mapi (fun name importance ->
            property_of_input (Id "selection") (name, importance))
@@ -386,16 +385,16 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
   in
 
   (* TODO: separate build-only deps from propagated *)
-  Attrs (attrset
+  Nix_expr.attrs
     (let base =
        [
          ("pname", Nix_expr.str (drvname_safe name));
          ("version", Nix_expr.str (drvname_safe version));
-         ("src", src |> Option.value  ~default:Null);
+         ("src", src |> Option.value  ~default:Nix_expr.Null);
          ("opamInputs", Attrs opam_inputs);
          ("opamSrc", match opam_src with `Dir expr | `File expr -> expr);
        ]
      in
      match nix_deps with
      | [] -> base
-     | nix_deps -> ("buildInputs", List nix_deps) :: base))
+     | nix_deps -> ("buildInputs", List nix_deps) :: base)

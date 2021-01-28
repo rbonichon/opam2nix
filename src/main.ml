@@ -1,6 +1,5 @@
 open Printf
 open Opam2nix
-open Util
 
 let commands : (string * (int -> string array -> unit)) list =
   [
@@ -27,7 +26,7 @@ let () =
             (let open OpamFilename in
             let open Op in
             Dir.of_string (Filename.get_temp_dir_name ()) / "opam2nix")
-          ();
+            ();
         try action 1 Sys.argv
         with Arg.Help err ->
           prerr_string err;
