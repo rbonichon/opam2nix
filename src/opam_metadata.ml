@@ -285,10 +285,10 @@ let nix_of_url ~cache (url : url) :
              digest
              |> Result.map (function `sha256 sha256 -> ("sha256", str sha256))
              |> Result.map (fun digest ->
-                    `Call
+                    Call
                       [
-                        `Lit "pkgs.fetchurl";
-                        attrset [ ("url", str src); digest ];
+                        Lit "pkgs.fetchurl";
+                        Attrs (attrset [ ("url", str src); digest ]);
                       ]))
 
 let unsafe_drvname_chars = Str.regexp "[^-_.0-9a-zA-Z]"
@@ -366,8 +366,8 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
 
   let property_of_input src (name, importance) : Nix_expr.t =
     match importance with
-    | Optional -> `Property_or (src, name, `Null)
-    | Required -> `PropertyPath (src, String.split_on_char '.' name)
+    | Optional -> Property_or (src, name, Null)
+    | Required -> PropertyPath (src, String.split_on_char '.' name)
   in
   let sorted_bindings_of_input input =
     input |> InputMap.bindings
@@ -377,25 +377,25 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
   let opam_inputs : Nix_expr.t AttrSet.t =
     !opam_inputs
     |> InputMap.mapi (fun name importance ->
-           property_of_input (`Id "selection") (name, importance))
+           property_of_input (Id "selection") (name, importance))
   in
 
   let nix_deps =
     !nix_deps |> sorted_bindings_of_input
-    |> List.map (property_of_input (`Id "pkgs"))
+    |> List.map (property_of_input (Id "pkgs"))
   in
 
   (* TODO: separate build-only deps from propagated *)
-  attrset
+  Attrs (attrset
     (let base =
        [
          ("pname", Nix_expr.str (drvname_safe name));
          ("version", Nix_expr.str (drvname_safe version));
-         ("src", src |> Option.value  ~default:`Null);
-         ("opamInputs", `Attrs opam_inputs);
+         ("src", src |> Option.value  ~default:Null);
+         ("opamInputs", Attrs opam_inputs);
          ("opamSrc", match opam_src with `Dir expr | `File expr -> expr);
        ]
      in
      match nix_deps with
      | [] -> base
-     | nix_deps -> ("buildInputs", `List nix_deps) :: base)
+     | nix_deps -> ("buildInputs", List nix_deps) :: base))

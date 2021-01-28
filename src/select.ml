@@ -246,11 +246,11 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
 
   let attrs =
     [
-      ("format-version", `Int 4);
-      ("repos", `Id "repos");
+      ("format-version", Int 4);
+      ("repos", Id "repos");
       ( "ocaml-version",
         str (external_constraints.ocaml_version |> Version.to_string) );
-      ("selection", `Attrs selection);
+      ("selection", Attrs selection);
     ]
   in
 
@@ -262,11 +262,11 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
            let open Repo in
            let spec = repo.spec in
            ( repo.repo_key,
-             `Rec_attrs
+             Rec_attrs
                (AttrSet.build
                   [
                     ( "fetch",
-                      `Attrs
+                      Attrs
                         (AttrSet.build
                            [
                              ("owner", str spec.github_owner);
@@ -275,26 +275,25 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
                              ("sha256", str (sha256 repo.repo_digest));
                            ]) );
                     ( "src",
-                      `Call
-                        [
-                          `Property (`Id "pkgs", "fetchFromGitHub"); `Id "fetch";
-                        ] );
+                      Call
+                        [ Property (Id "pkgs", "fetchFromGitHub"); Id "fetch" ]
+                    );
                   ]) ))
   in
 
   let expr : Nix_expr.t =
-    `Function
-      ( `Id "self",
-        `Let_bindings
+    Function
+      ( Id "self",
+        Let_bindings
           ( AttrSet.build
               [
-                ("lib", `Lit "self.lib");
-                ("pkgs", `Lit "self.pkgs");
-                ("selection", `Lit "self.selection");
-                ("repoPath", `Lit "self.repoPath");
-                ("repos", `Attrs (AttrSet.build repo_attrsets));
+                ("lib", Lit "self.lib");
+                ("pkgs", Lit "self.pkgs");
+                ("selection", Lit "self.selection");
+                ("repoPath", Lit "self.repoPath");
+                ("repos", Attrs (AttrSet.build repo_attrsets));
               ],
-            `Attrs (AttrSet.build attrs) ) )
+            Attrs (AttrSet.build attrs) ) )
   in
   Lwt_main.run (Digest_cache.save cache);
   let oc = open_out dest in

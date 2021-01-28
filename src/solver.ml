@@ -73,10 +73,10 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
                      Lwt.return
                        (Ok
                           (Some
-                             (`Call
+                             (Nix_expr.Call
                                [
-                                 `Lit "self.directSrc";
-                                 name |> Name.to_string |> Nix_expr.str;
+                                 Lit "self.directSrc";
+                                 Nix_expr.str (Name.to_string name);
                                ]))));
                  repository_expr =
                    (fun () ->
@@ -107,11 +107,11 @@ let load_package ~url pkg : loaded_package =
            let digest = "sha256:" ^ digest in
            `Dir
              Nix_expr.(
-               `Call
+               Call
                  [
-                   `Id "repoPath";
-                   `PropertyPath (`Id "repos", [ pkg.repo.repo_key; "src" ]);
-                   `Attrs
+                   Id "repoPath";
+                   PropertyPath (Id "repos", [ pkg.repo.repo_key; "src" ]);
+                   Attrs
                      (AttrSet.build
                         [ ("package", str pkg.rel_path); ("hash", str digest) ]);
                  ]))
