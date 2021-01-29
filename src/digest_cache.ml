@@ -1,10 +1,6 @@
 module JSON = Yojson.Basic
 
-module Cache = struct
-  include Map.Make (String)
-end
-
-module StringSet = Set.Make (String)
+module Cache = OpamStd.String.Map
 
 type key = string
 

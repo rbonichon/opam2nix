@@ -171,7 +171,7 @@ let setup_external_constraints ~repos_base ~repos ~detect_from ~ocaml_version
   in
 
   let resolved_repos =
-    StringMap.bindings repos
+    OpamStd.String.Map.bindings repos
     |> Lwt_list.map_p (fun (key, spec) ->
            setup_repo ~cache ~key ~repos_base spec)
   in
@@ -305,7 +305,7 @@ let main idx args =
   let base_packages = ref "" in
   let repo_specs =
     ref
-      (StringMap.singleton "opam-repository"
+      (OpamStd.String.Map.singleton "opam-repository"
          {
            github_owner = "ocaml";
            github_name = "opam-repository";
@@ -328,9 +328,9 @@ let main idx args =
       | [ repo; commit ] -> parse_repo ~commit:(Some commit) repo
       | _ -> failwith ("Repo contains multiple `#` characters: " ^ repo)
     in
-    let op = if StringMap.mem key !repo_specs then "Replacing" else "Adding" in
-    Printf.eprintf "%s repository: %s ...\n" op key;
-    repo_specs := !repo_specs |> StringMap.add key spec
+    let op = if OpamStd.String.Map.mem key !repo_specs then "Replacing" else "Adding" in
+    Format.eprintf "%s repository: %s ...@." op key;
+    repo_specs := !repo_specs |> OpamStd.String.Map.add key spec
   in
 
   let direct_definitions = ref [] in

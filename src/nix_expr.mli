@@ -1,11 +1,5 @@
 (** [AttrSet] *)
-module AttrSet : sig
-  include Map.S with type key = string
-
-  val of_list : (key * 'a) list -> 'a t
-
-  val keys : 'a t -> key list
-end
+module AttrSet : OpamStd.MAP with type key = string 
 
 type t =
   | String of string list

@@ -61,4 +61,3 @@ let () =
   let envvar = getenv_opt "OPAM2NIX_VERBOSE" |> Option.value ~default:"" in
   set_verbose (envvar = "1" || envvar = "true")
 
-module StringMap = Map.Make (String)

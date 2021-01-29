@@ -1,10 +1,4 @@
-module AttrSet = struct
-  include Util.StringMap
-
-  let of_list pairs = List.fold_left (fun map (k, v) -> add k v map) empty pairs
-
-  let keys map = bindings map |> List.map fst
-end
+module AttrSet = OpamStd.String.Map
 
 (* type arg =
  *   | Formal of string

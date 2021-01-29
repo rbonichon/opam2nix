@@ -32,8 +32,5 @@ val without_leading : string -> string -> string option
 val rm_r : string -> unit
 (** [rec] *)
 
-module StringMap : Map.S with type key = string
-(** [StringMap] *)
-
 val _verbose : bool ref
 (** [_verbose] *)
