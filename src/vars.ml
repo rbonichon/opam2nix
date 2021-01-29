@@ -37,7 +37,7 @@ let implicit_package_var key =
   | _ -> None
 
 (* TODO `env` could just be ocaml version *)
-let path_var ~env ~prefix ~scope key =
+let path_var ?scope ~env ~prefix key =
   (* global vars reference dirs inside the prefix (swtich) location, whereas scoped vars
      * refer to the package dir within the above location *)
   let scope = ref scope in
@@ -57,7 +57,7 @@ let path_var ~env ~prefix ~scope key =
   relpath key
   |> Option.map (fun relpath ->
          let base = prefix / relpath in
-         S
+         OpamVariable.S
            (OpamFilename.Dir.to_string
               ( match !scope with
               | None -> base
@@ -71,7 +71,9 @@ let package_var ~env =
   let installed = function Absent -> false | Provided | Installed _ -> true in
   let rec lookup ~pkg key =
     debug "(variable `%s` of package `%s`)\n" key (Name.to_string pkg);
-    let impl = Name.Map.find_opt pkg env.packages |> Option.value ~default:Absent in
+    let impl =
+      Name.Map.find_opt pkg env.packages |> Option.value ~default:Absent
+    in
     match key with
     | "installed" -> b (installed impl)
     | "enable" -> s (if installed impl then "enable" else "disable")
@@ -83,14 +85,14 @@ let package_var ~env =
             None
             (* all vars aside from `installed` are undefined if the package is absent *)
         | Installed { path; version } ->
-
-            Option.bind             path (fun path ->
-                   path_var ~env ~prefix:path ~scope:(Some pkg) key)
+            Option.bind path (fun path ->
+                path_var ~env ~prefix:path ~scope:pkg key)
             |> Option.or_else
                  ( match key with
                  | "dev" -> r_false
                  | "build-id" ->
-                     path |> Option.map string_of_dir |> fun v -> Option.bind v s
+                     path |> Option.map string_of_dir |> fun v ->
+                     Option.bind v s
                  (* nix paths are unique :) *)
                  (* test and doc are undocumented, but appear in the wild... *)
                  | "test" | "with-test" -> r_false
@@ -110,8 +112,7 @@ let package_var ~env =
                      r_false
                      (* dep is to be installed after (or unrelated to) this package. Doesn't make much sense in nix *)
                  | "version" ->
-                     version
-                     |> Option.map OpamPackage.Version.to_string
+                     version |> Option.map OpamPackage.Version.to_string
                      |> fun v -> Option.bind v s
                  | "hash" | "depends" ->
                      (* no reasonable way to implement these, and no use cases reported *)
@@ -157,7 +158,7 @@ let lookup env key =
                    (* Try resolving remaining vars as scope-less directories,
                       * and then fallback to resolving a self-var. *)
                    Option.bind env.prefix (fun prefix ->
-                          path_var ~env ~prefix ~scope:None unqualified)
+                       path_var ~env ~prefix unqualified)
                    |> Option.or_else_fn (fun () ->
                           package_var ~pkg:env.self unqualified) ))
   in
