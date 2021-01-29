@@ -14,9 +14,6 @@ to avoid a full dependency on opam-client *)
 
 let log ?level fmt = OpamConsole.log ?level "ACTION" fmt
 
-let slog = OpamConsole.slog
-
-open OpamTypes
 open OpamFilename.Op
 open OpamProcess.Job.Op
 
