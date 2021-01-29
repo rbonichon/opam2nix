@@ -2,7 +2,6 @@ open Util
 open OpamFile
 module Version = OpamPackage.Version
 module Name = OpamPackage.Name
-module Seq = Seq_ext
 
 type spec = {
   github_owner : string;
@@ -20,7 +19,7 @@ type t = {
   repo_digest : Digest_cache.nix_digest Lwt.t;
 }
 
-let repo_key {repo_key; _} = repo_key
+let repo_key { repo_key; _ } = repo_key
 
 type package = {
   repo : t;
@@ -83,8 +82,7 @@ let list_package =
           debug "Skipping (%s)\n" e;
           []
       in
-      dirs
-      |> filter_map (without_leading (package ^ version_sep))
+      filter_map (without_leading (package ^ version_sep)) dirs
       |> List.map Version.of_string
       |> List.filter (fun version ->
              Sys.file_exists
