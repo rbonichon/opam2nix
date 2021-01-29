@@ -35,7 +35,7 @@ let assert_string_var =
         ^ Option.to_string string_of_variable_contents other )
 
 let vardir ~vars ~dest name =
-  Vars.path_var ~env:vars ~prefix:dest ~scope:None name
+  Vars.path_var ~env:vars ~prefix:dest name
   |> assert_string_var |> OpamFilename.Dir.of_string
 
 let outputDirs ~vars dest =

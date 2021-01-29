@@ -1,35 +1,28 @@
-
 include module type of Stdlib.Option
 
+val tap : ('a -> unit) -> 'a t -> 'a t
 (** [tap] *)
-val tap: ('a -> unit) -> 'a t -> 'a t ;;
 
-
+val may : ('a -> unit) -> 'a t -> unit
 (** [may] *)
-val may: ('a -> unit) -> 'a t -> unit ;;
 
+val or_else : 'a t -> 'a t -> 'a t
 (** [or_else] *)
-val or_else: 'a t -> 'a t -> 'a t ;;
 
-
+val default_fn : (unit -> 'a) -> 'a t -> 'a
 (** [default_fn] *)
-val default_fn: (unit -> 'a) -> 'a t -> 'a ;;
 
+val or_else_fn : (unit -> 'a t) -> 'a t -> 'a t
 (** [or_else_fn] *)
-val or_else_fn: (unit -> 'a t) -> 'a t -> 'a t ;;
 
-
+val to_string : ('a -> string) -> 'a t -> string
 (** [to_string] *)
-val to_string: ('a -> string) -> 'a t -> string ;;
 
-
+val sequence_result : ('a, 'b) result t -> ('a t, 'b) result
 (** [sequence_result] *)
-val sequence_result: ('a, 'b) result t -> ('a t, 'b) result ;;
 
-
+val or_failwith : string -> 'a t -> 'a
 (** [or_failwith] *)
-val or_failwith: string -> 'a t -> 'a ;;
 
-
+val filter : ('a -> bool) -> 'a t -> 'a t
 (** [filter] *)
-val filter: ('a -> bool) -> 'a t -> 'a t ;;

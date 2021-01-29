@@ -74,10 +74,10 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
                        (Ok
                           (Some
                              (Nix_expr.Call
-                               [
-                                 Lit "self.directSrc";
-                                 Nix_expr.str (Name.to_string name);
-                               ]))));
+                                [
+                                  Lit "self.directSrc";
+                                  Nix_expr.str (Name.to_string name);
+                                ]))));
                  repository_expr =
                    (fun () ->
                      Lwt.return

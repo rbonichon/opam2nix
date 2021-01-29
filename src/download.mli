@@ -1,20 +1,19 @@
+type error = [ `download_failed of string ]
 
-
-type error = [ `download_failed of string ] ;;
-
-
+val string_of_error : [< `download_failed of string ] -> string
 (** [string_of_error] *)
-val string_of_error: [< `download_failed of string ] -> string ;;
-
 
 (** [Ctx] *)
-module Ctx: sig
+module Ctx : sig
   type t
+
   val init : unit -> t
+
   val destroy : t -> unit
+
   val use : t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
-end ;;
+end
 
-
+val fetch :
+  Ctx.t -> dest:out_channel -> string -> (unit, [> error ]) result Lwt.t
 (** [fetch] *)
-val fetch: Ctx.t -> dest:out_channel -> string -> (unit, [> error ]) result Lwt.t ;;

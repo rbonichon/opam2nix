@@ -1,4 +1,4 @@
-include Stdlib.Option  
+include Stdlib.Option
 
 let tap fn = function
   | None -> None
@@ -6,9 +6,7 @@ let tap fn = function
       fn x;
       Some x
 
-let filter p = function
-  | None -> None
-  | Some x -> if p x then Some x else None
+let filter p = function None -> None | Some x -> if p x then Some x else None
 
 let may fn = function None -> () | Some x -> fn x
 

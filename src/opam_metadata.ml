@@ -287,8 +287,7 @@ let nix_of_url ~cache (url : url) :
              |> Result.map (fun digest ->
                     call
                       [
-                        lit "pkgs.fetchurl";
-                        attrs [ ("url", str src); digest ];
+                        lit "pkgs.fetchurl"; attrs [ ("url", str src); digest ];
                       ]))
 
 let unsafe_drvname_chars = Str.regexp "[^-_.0-9a-zA-Z]"
@@ -358,7 +357,9 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
   let () = add_opam_deps ~add_dep opam in
 
   let url_ends_with ext =
-    match url with Some (`http (url, _)) -> Util.ends_with ext url | None -> false
+    match url with
+    | Some (`http (url, _)) -> Util.ends_with ext url
+    | None -> false
   in
 
   if url_ends_with ".zip" then add_native Required "unzip";
@@ -390,7 +391,7 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
        [
          ("pname", Nix_expr.str (drvname_safe name));
          ("version", Nix_expr.str (drvname_safe version));
-         ("src", src |> Option.value  ~default:Nix_expr.Null);
+         ("src", src |> Option.value ~default:Nix_expr.Null);
          ("opamInputs", Attrs opam_inputs);
          ("opamSrc", match opam_src with `Dir expr | `File expr -> expr);
        ]

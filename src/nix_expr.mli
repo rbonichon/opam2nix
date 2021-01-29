@@ -1,12 +1,13 @@
 (** [AttrSet] *)
-module AttrSet: sig
-  include Map.S with type key = string 
+module AttrSet : sig
+  include Map.S with type key = string
+
   val of_list : (key * 'a) list -> 'a t
+
   val keys : 'a t -> key list
-end ;;
+end
 
-
-type t = 
+type t =
   | String of string list
   (* | MultilineString of string list *)
   | List of t list
@@ -25,21 +26,21 @@ type t =
   | Lit of string
   (* | BinaryOp of t * string * t *)
   | Null
-  | With of t * t 
+  | With of t * t
 
-
-
+val str : string -> t
 (** [str] *)
-val str: string -> t
 
-
+val attrset : (string * 'a) list -> 'a AttrSet.t
 (** [attrset] *)
-val attrset: (string * 'a) list -> 'a AttrSet.t ;;
 
 val attrs : (string * t) list -> t
+
 val rec_attrs : (string * t) list -> t
+
 val call : t list -> t
+
 val lit : string -> t
 
+val write_file : filename:string -> t -> unit
 (** [write_file] *)
-val write_file: filename:string -> t -> unit ;;

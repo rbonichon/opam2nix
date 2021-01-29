@@ -46,6 +46,5 @@ val full_path : package -> string
 val list_package : t -> string -> package list
 (** [list_package] *)
 
-
 val git_url : spec -> string
 (** [git_url] *)

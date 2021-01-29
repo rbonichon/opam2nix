@@ -87,8 +87,8 @@ let write ppf (t : t) =
     let parens_if_needed part =
       match part with
       (* for neatness, we don't bother enclosing simple expressions in parens *)
-      | Id _ | Int _ | Lit _ | String _ (* | MultilineString _ *) | List _ | Attrs _
-      | Rec_attrs _ ->
+      | Id _ | Int _ | Lit _ | String _ (* | MultilineString _ *) | List _
+      | Attrs _ | Rec_attrs _ ->
           _write ppf part
       | _ -> fprintf ppf "(%a)" _write part
     in

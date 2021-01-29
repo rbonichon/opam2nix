@@ -1,51 +1,39 @@
-
-
+val verbose : unit -> bool
 (** [verbose] *)
-val verbose: unit -> bool ;;
 
-
+val without_trailing : string -> string -> string option
 (** [without_trailing] *)
-val without_trailing: string -> string -> string option ;;
 
-
+val debug : ('a, out_channel, unit) format -> 'a
 (** [debug] *)
-val debug: ('a, out_channel, unit) format -> 'a ;;
-
 
 (** [List] *)
-module List: sig
-  include module type of List 
+module List : sig
+  include module type of List
+
   val to_string : ('a -> string) -> 'a t -> string
-end ;;
+end
 
-
+val getenv_opt : string -> string option
 (** [getenv_opt] *)
-val getenv_opt: string -> string option ;;
 
-
+val filter_map : ('a -> 'b option) -> 'a list -> 'b list
 (** [filter_map] *)
-val filter_map: ('a -> 'b option) -> 'a list -> 'b list ;;
 
-
+val ends_with : string -> string -> bool
 (** [ends_with] *)
-val ends_with: string -> string -> bool ;;
 
-
+val list_dirs : string -> string list
 (** [list_dirs] *)
-val list_dirs: string -> string list ;;
 
-
+val without_leading : string -> string -> string option
 (** [without_leading] *)
-val without_leading: string -> string -> string option ;;
 
-
+val rm_r : string -> unit
 (** [rec] *)
-val rm_r: string -> unit ;;
 
-
+module StringMap : Map.S with type key = string
 (** [StringMap] *)
-module StringMap : Map.S with type key = string 
 
-
+val _verbose : bool ref
 (** [_verbose] *)
-val _verbose: bool ref ;;

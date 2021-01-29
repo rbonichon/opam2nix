@@ -128,17 +128,17 @@ let save cache =
     Cache.fold
       (fun key (value : (nix_digest, error) Result.t Lwt.t)
            (acc : nix_digest Cache.t Lwt.t) ->
-                Lwt.bind value (function
-             | Ok digest -> acc |> Lwt.map (Cache.add key digest)
-             | Error _ -> acc (* drop from cache *)))
+        Lwt.bind value (function
+          | Ok digest -> acc |> Lwt.map (Cache.add key digest)
+          | Error _ -> acc (* drop from cache *)))
       !cache.digests (Lwt.return Cache.empty)
   in
-  digests |> Lwt.map json_of_cache
-  |> fun v -> Lwt.bind v (fun json ->
-         Lwt_io.with_file ~mode:Lwt_io.Output tmp (fun chan ->
-             let contents = JSON.pretty_to_string ~std:true json in
-             Lwt_io.write chan contents))
-  |> fun v -> Lwt.bind v  (fun () -> Lwt_unix.rename tmp path)
+  digests |> Lwt.map json_of_cache |> fun v ->
+  Lwt.bind v (fun json ->
+      Lwt_io.with_file ~mode:Lwt_io.Output tmp (fun chan ->
+          let contents = JSON.pretty_to_string ~std:true json in
+          Lwt_io.write chan contents))
+  |> fun v -> Lwt.bind v (fun () -> Lwt_unix.rename tmp path)
 
 let sha256_of_path p =
   let output =
