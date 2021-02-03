@@ -15,7 +15,6 @@
 , ocurl
 , yojson
 , fileutils
-, gup
 , ounit
 , makeWrapper
 , dune
@@ -44,7 +43,7 @@ let
       ({
         format_version = import ./format_version.nix;
         devInputs = [ utop ];
-        # expose ability to re-make API with nondefault params
+        # expose ability to re-make API with nondefault params@
         api = makeApi;
       }) // defaultApi;
     buildInputs = [
@@ -60,7 +59,6 @@ let
       }))
       yojson
       fileutils
-      gup
       ounit
       makeWrapper
       ocaml-migrate-parsetree
