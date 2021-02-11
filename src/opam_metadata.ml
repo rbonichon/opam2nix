@@ -1,10 +1,3 @@
-open Util
-module URL = OpamFile.URL
-module OPAM = OpamFile.OPAM
-module Descr = OpamFile.Descr
-module StringSet = OpamStd.String.Set
-module StringSetMap = OpamStd.String.SetMap
-
 type url = [ `http of string * Digest_cache.opam_digest list ]
 
 let string_of_url : url -> string = function `http (url, _digest) -> url
@@ -170,7 +163,7 @@ let add_nix_inputs ~(add_native : Importance.t -> string -> unit)
     match importance with Required -> "dep" | Optional -> "optional dep"
   in
   let nixos_env = Vars.simple_lookup ~vars:(nixos_vars ()) in
-  debug "Adding dependency: %s\n" (Dependency.to_string dep);
+  Util.debug "Adding dependency: %s\n" (Dependency.to_string dep);
 
   match dep with
   (* | Dependency.Nix name -> add_native importance name *)
@@ -189,10 +182,10 @@ let add_nix_inputs ~(add_native : Importance.t -> string -> unit)
       let importance, deps =
         match Util.filter_map (apply_filters nixos_env) externals with
         | [] ->
-            debug
+            Util.debug
               "  Note: package has depexts, but none of them `nixos`:\n    %s\n"
               (Dependency.to_string dep);
-            debug "  Adding them all as `optional` dependencies.\n";
+            Util.debug "  Adding them all as `optional` dependencies.\n";
             Requirement.optional @@ List.map fst externals
         | nixos_deps -> Requirement.required nixos_deps
       in
@@ -201,7 +194,7 @@ let add_nix_inputs ~(add_native : Importance.t -> string -> unit)
           OpamSysPkg.Set.iter
             (fun dep ->
               let name = OpamSysPkg.to_string dep in
-              debug "  adding nix %s: %s\n" desc name;
+              Util.debug "  adding nix %s: %s\n" desc name;
               add_native importance name)
             deps)
         deps
@@ -254,7 +247,7 @@ class dependency_map =
   end
 
 let url urlfile : (url, [> unsupported_archive ]) Result.t =
-  let url, checksums = (URL.url urlfile, URL.checksum urlfile) in
+  let url, checksums = (OpamFile.URL.url urlfile, OpamFile.URL.checksum urlfile) in
   let OpamUrl.{ hash; transport; backend; _ } = url in
   let url_without_backend = OpamUrl.base_url url in
   let checksums =
@@ -285,9 +278,9 @@ let load_opam path =
   let dir = Dir.of_string (Filename.dirname path) in
   let base = Base.of_string (Filename.basename path) in
   let file = OpamFilename.create dir base |> OpamFile.make in
-  let loaded = OPAM.read file in
-  if OPAM.format_errors loaded <> [] then (
-    OPAM.print_errors loaded;
+  let loaded = OpamFile.OPAM.read file in
+  if OpamFile.OPAM.format_errors loaded <> [] then (
+    OpamFile.OPAM.print_errors loaded;
     failwith (Printf.sprintf "Invalid OPAM file: %s" path) );
   loaded |> OpamFormatUpgrade.opam_file
 
@@ -311,7 +304,7 @@ let unsafe_drvname_chars = Str.regexp "[^-_.0-9a-zA-Z]"
 let drvname_safe str = Str.global_replace unsafe_drvname_chars "-" str
 
 let add_implicit_build_dependencies ~add_dep commands =
-  let implicit_optdeps = ref StringSet.empty in
+  let implicit_optdeps = ref OpamStd.String.Set.empty in
   (* If your build command depends on foo:installed, you have an implicit optional
      * build dependency on foo. Packages *should* declare this, but don't always... *)
   let lookup_var key =
@@ -319,8 +312,8 @@ let add_implicit_build_dependencies ~add_dep commands =
     | None -> None
     | Some pkg ->
         let pkgname = OpamPackage.Name.to_string pkg in
-        debug "  adding implied dep: %s\n" pkgname;
-        implicit_optdeps := !implicit_optdeps |> StringSet.add pkgname;
+        Util.debug "  adding implied dep: %s\n" pkgname;
+        implicit_optdeps := !implicit_optdeps |> OpamStd.String.Set.add pkgname;
         (* value doesn't actually matter, since we don't use the result *)
         Some (OpamTypes.B true)
   in
@@ -328,15 +321,15 @@ let add_implicit_build_dependencies ~add_dep commands =
     (fun commands -> ignore @@ OpamFilter.commands lookup_var commands)
     commands;
   !implicit_optdeps
-  |> StringSet.iter (fun pkg ->
+  |> OpamStd.String.Set.iter (fun pkg ->
          add_dep Importance.Optional (Dependency.SimpleOpam pkg))
 
-let add_opam_deps ~add_dep (opam : OPAM.t) =
+let add_opam_deps ~add_dep (opam : OpamFile.OPAM.t) =
   add_implicit_build_dependencies ~add_dep
-    [ OPAM.build opam; OPAM.install opam ];
-  add_dep Optional (Dependency.Package (OPAM.depopts opam));
-  add_dep Required (Dependency.Package (OPAM.depends opam));
-  let depexts = OPAM.depexts opam in
+    [ OpamFile.OPAM.build opam; OpamFile.OPAM.install opam ];
+  add_dep Optional (Dependency.Package (OpamFile.OPAM.depopts opam));
+  add_dep Required (Dependency.Package (OpamFile.OPAM.depends opam));
+  let depexts = OpamFile.OPAM.depexts opam in
   if depexts <> [] then add_dep Required (Dependency.External depexts)
 
 module InputMap = struct
