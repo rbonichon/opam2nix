@@ -18,28 +18,9 @@ exception Invalid_package of string
 
 let var_prefix = "opam_var_"
 
-type dependency =
-  | NixDependency of string
-  | SimpleOpamDependency of string
-  | ExternalDependencies of (OpamSysPkg.Set.t * OpamTypes.filter) list
-  | PackageDependencies of OpamTypes.filtered_formula
 
-type importance = Required | Optional
 
-type requirement = importance * dependency
-
-module ImportanceOrd = struct
-  type t = importance
-
-  let compare a b =
-    match (a, b) with
-    | Required, Required | Optional, Optional -> 0
-    | Required, _ -> 1
-    | Optional, _ -> -1
-
-  let more_important a b = compare a b > 0
-end
-
+open Format 
 let string_of_relop : relop -> string = function
   | `Eq -> "="
   | `Geq -> ">="
@@ -48,18 +29,29 @@ let string_of_relop : relop -> string = function
   | `Lt -> "<"
   | `Neq -> "!="
 
-let string_of_dependency = function
-  | NixDependency dep -> "nix:" ^ dep
-  | SimpleOpamDependency dep -> "package:" ^ dep
-  | ExternalDependencies deps ->
-      "external:"
-      ^ (List.to_string (fun (deps, filter) ->
-             let names =
-               deps |> OpamSysPkg.Set.elements |> List.map OpamSysPkg.to_string
-             in
-             String.concat "," names ^ " {" ^ OpamFilter.to_string filter ^ "}"))
-          deps
-  | PackageDependencies formula ->
+module Dependency = struct 
+  type t =
+  | Nix of string
+  | SimpleOpam of string
+  | External of (OpamSysPkg.Set.t * OpamTypes.filter) list
+  | Package of OpamTypes.filtered_formula
+
+let pp ppf = function
+  | Nix dep ->
+     fprintf ppf "nix:%s" dep
+  | SimpleOpam dep -> fprintf ppf "package:%s" dep
+  | External deps ->
+     fprintf ppf 
+       "@[<hov>external:[%a]@]"
+       ((pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ "))
+          (fun ppf (deps, filter) ->
+            fprintf ppf "[<hov>%a@ {%s}@]"
+              (fun ppf set ->
+                OpamSysPkg.Set.iter (fun pkg -> fprintf ppf "%s," (OpamSysPkg.to_string pkg)) set
+              ) deps 
+              (OpamFilter.to_string filter)))
+          deps 
+  | Package formula ->
       (* of OpamTypes.formula *)
       let string_of_filter : filter filter_or_constraint -> string = function
         | Filter f -> OpamFilter.to_string f
@@ -73,15 +65,41 @@ let string_of_dependency = function
         ^ ":"
         ^ OpamFormula.string_of_formula string_of_filter formula
       in
-      "package-formula:" ^ OpamFormula.string_of_formula string_of_atom formula
+      fprintf ppf "package_formula:%s" (OpamFormula.string_of_formula string_of_atom formula)
 
-let string_of_requirement = function
-  | Required, dep -> string_of_dependency dep
-  | Optional, dep -> "{" ^ string_of_dependency dep ^ "}"
+let to_string t = Format.asprintf "%a" pp t (* TODO:  *)
+end
 
-let string_of_importance = function
-  | Required -> "required"
-  | Optional -> "optional"
+module Importance = struct
+  type t = Required | Optional
+  let pp ppf = function
+  | Required -> pp_print_string ppf "required"
+  | Optional -> pp_print_string ppf "optional"
+
+  let to_string t = Format.asprintf "%a" pp t
+
+  let compare a b =
+    match (a, b) with
+    | Required, Required | Optional, Optional -> 0
+    | Required, _ -> 1
+    | Optional, _ -> -1
+
+  let more_important a b = compare a b > 0
+end
+
+
+module Requirement = struct 
+  type t = Importance.t * Dependency.t
+
+  let pp ppf = function
+    | Importance.Required, dep -> Dependency.pp ppf dep
+    | Importance.Optional, dep -> fprintf ppf "{%a}" Dependency.pp dep
+
+  let to_string t = Format.asprintf "%a" pp t
+
+  let optional d = (Importance.Optional, d)
+  let required d = Importance.Required, d
+end 
 
 let add_var (scope : OpamVariable.t -> OpamVariable.Full.t) name v vars =
   let var : OpamVariable.Full.t = scope (OpamVariable.of_string name) in
@@ -149,17 +167,19 @@ let installed_pkg_var key =
       Some pkg
   | _ -> None
 
-let add_nix_inputs ~(add_native : importance -> string -> unit)
-    ~(add_opam : importance -> string -> unit) importance dep =
+let add_nix_inputs ~(add_native : Importance.t -> string -> unit)
+    ~(add_opam : Importance.t -> string -> unit) importance dep =
   let desc =
+    let open Importance in 
     match importance with Required -> "dep" | Optional -> "optional dep"
   in
   let nixos_env = Vars.simple_lookup ~vars:(nixos_vars ()) in
-  debug "Adding dependency: %s\n" (string_of_dependency dep);
+  debug "Adding dependency: %s\n" (Dependency.to_string dep);
+  
   match dep with
-  | NixDependency name -> add_native importance name
-  | SimpleOpamDependency dep -> add_opam importance dep
-  | ExternalDependencies externals ->
+  | Dependency.Nix name -> add_native importance name
+  | Dependency.SimpleOpam dep -> add_opam importance dep
+  | Dependency.External externals ->
       let apply_filters env (deps, filter) =
         try
           if OpamFilter.eval_to_bool ~default:false env filter then Some deps
@@ -171,14 +191,15 @@ let add_nix_inputs ~(add_native : importance -> string -> unit)
       in
 
       let importance, deps =
-        let nixos_deps = Util.filter_map (apply_filters nixos_env) externals in
-        if nixos_deps = [] then (
+        match Util.filter_map (apply_filters nixos_env) externals with 
+        | [] ->
           debug
             "  Note: package has depexts, but none of them `nixos`:\n    %s\n"
-            (string_of_dependency dep);
+            (Dependency.to_string dep);
           debug "  Adding them all as `optional` dependencies.\n";
-          (Optional, List.map fst externals) )
-        else (Required, nixos_deps)
+          Requirement.optional @@ List.map fst externals
+        | nixos_deps -> 
+           Requirement.required nixos_deps
       in
       List.iter
         (fun deps ->
@@ -189,7 +210,7 @@ let add_nix_inputs ~(add_native : importance -> string -> unit)
               add_native importance name)
             deps)
         deps
-  | PackageDependencies formula ->
+  | Dependency.Package formula ->
       let add importance (pkg, _version) =
         add_opam importance (OpamPackage.Name.to_string pkg)
       in
@@ -214,27 +235,25 @@ let add_nix_inputs ~(add_native : importance -> string -> unit)
         ~doc:false ~default:false ~env:nixos_env formula
       |> add_formula Optional
 
-module PackageMap = OpamPackage.Map
-
 class dependency_map =
-  let map : requirement list PackageMap.t ref = ref PackageMap.empty in
+  let map : Requirement.t list OpamPackage.Map.t ref = ref OpamPackage.Map.empty in
   let get_existing package_id =
-    try PackageMap.find package_id !map with Not_found -> []
+    try OpamPackage.Map.find package_id !map with Not_found -> []
   in
   object
     method init_package package_id =
       let existing = get_existing package_id in
-      map := PackageMap.add package_id existing !map
+      map := OpamPackage.Map.add package_id existing !map
 
-    method add_dep package_id (dep : requirement) =
+    method add_dep package_id (dep : Requirement.t) =
       let existing = get_existing package_id in
-      map := PackageMap.add package_id (dep :: existing) !map
+      map := OpamPackage.Map.add package_id (dep :: existing) !map
 
     method to_string =
       let reqs_to_string reqs =
-        String.concat "," (List.map string_of_requirement reqs)
+        String.concat "," (List.map Requirement.to_string reqs)
       in
-      PackageMap.to_string reqs_to_string !map
+      OpamPackage.Map.to_string reqs_to_string !map
   end
 
 let url urlfile : (url, [> unsupported_archive ]) Result.t =
@@ -315,15 +334,15 @@ let add_implicit_build_dependencies ~add_dep commands =
          in
          ());
   !implicit_optdeps
-  |> StringSet.iter (fun pkg -> add_dep Optional (SimpleOpamDependency pkg))
+  |> StringSet.iter (fun pkg -> add_dep Importance.Optional (Dependency.SimpleOpam pkg))
 
 let add_opam_deps ~add_dep (opam : OPAM.t) =
   add_implicit_build_dependencies ~add_dep
     [ OPAM.build opam; OPAM.install opam ];
-  add_dep Optional (PackageDependencies (OPAM.depopts opam));
-  add_dep Required (PackageDependencies (OPAM.depends opam));
+  add_dep Optional (Dependency.Package (OPAM.depopts opam));
+  add_dep Required (Dependency.Package (OPAM.depends opam));
   let depexts = OPAM.depexts opam in
-  if depexts <> [] then add_dep Required (ExternalDependencies depexts)
+  if depexts <> [] then add_dep Required (Dependency.External depexts)
 
 module InputMap = struct
   include Nix_expr.AttrSet
@@ -331,7 +350,7 @@ module InputMap = struct
   (* override `add` to keep the "most required" entry *)
   let add k v map =
     match find_opt k map with
-    | Some existing when ImportanceOrd.more_important existing v -> map
+    | Some existing when Importance.more_important existing v -> map
     | Some _ | None -> add k v map
 end
 
@@ -366,8 +385,8 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
 
   let property_of_input src (name, importance) : Nix_expr.t =
     match importance with
-    | Optional -> Property_or (src, name, Null)
-    | Required -> PropertyPath (src, String.split_on_char '.' name)
+    | Importance.Optional -> Property_or (src, name, Null)
+    | Importance.Required -> PropertyPath (src, String.split_on_char '.' name)
   in
   let sorted_bindings_of_input input =
     input |> InputMap.bindings

@@ -1,4 +1,3 @@
-open Util
 module Name = OpamPackage.Name
 module Version = OpamPackage.Version
 module OPAM = OpamFile.OPAM

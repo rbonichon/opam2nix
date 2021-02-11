@@ -7,12 +7,6 @@ val without_trailing : string -> string -> string option
 val debug : ('a, out_channel, unit) format -> 'a
 (** [debug] *)
 
-(** [List] *)
-module List : sig
-  include module type of List
-
-  val to_string : ('a -> string) -> 'a t -> string
-end
 
 val getenv_opt : string -> string option
 (** [getenv_opt] *)

@@ -38,11 +38,6 @@ let rec rm_r root =
            if Sys.is_directory path then rm_r path else Unix.unlink path);
     Unix.rmdir root )
 
-module List = struct
-  include List
-
-  let to_string fn lst = "[" ^ String.concat ", " (map fn lst) ^ "]"
-end
 
 let _verbose = ref false
 
@@ -60,4 +55,3 @@ let getenv_opt name = try Some (Unix.getenv name) with Not_found -> None
 let () =
   let envvar = getenv_opt "OPAM2NIX_VERBOSE" |> Option.value ~default:"" in
   set_verbose (envvar = "1" || envvar = "true")
-
