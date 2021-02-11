@@ -1,23 +1,31 @@
-open Printf
-open Opam2nix
-
 let commands : (string * (int -> string array -> unit)) list =
+  let open Opam2nix in
   [
-    ("invoke", Invoke.main); ("resolve", Select.main); ("version", Version.main);
+    ("invoke", Invoke.main); ("resolve", Resolve.main); ("version", Version.main);
   ]
+
+let usage ppf () =
+  Format.fprintf ppf
+    "@[<v>Usage: opam2nix <command> [args]@,\
+     @[<v 2>Available commands:@,\
+     %a@]@,\
+     @,\
+     @[<hov>Use `opam2nix <command> --help` to get@ the documentation@ for@ a \
+     specific command.@]@]@."
+    (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (name, _) ->
+         Format.fprintf ppf "@[<h>- %s@]" name))
+    commands
 
 let () =
   if Array.length Sys.argv <= 1 then (
-    eprintf "Usage: opam2nix <command> [args]\n\nAvailable commands: %s"
-      (commands |> List.map (fun (name, _) -> name) |> String.concat ", ");
+    usage Format.err_formatter ();
     exit 1 )
   else
     let commandName = Sys.argv.(1) in
     let command =
-      try
-        Some (commands |> List.find (fun (name, _action) -> name = commandName))
-      with Not_found -> None
+      List.find_opt (fun (name, _action) -> name = commandName) commands
     in
+
     match command with
     | Some (_name, action) -> (
         Printf.eprintf "+ %s\n" (Sys.argv |> Array.to_list |> String.concat " ");
@@ -32,5 +40,5 @@ let () =
           prerr_string err;
           exit 1 )
     | None ->
-        eprintf "Unknown command: %s\n" commandName;
+        Format.eprintf "@[<v>Unknown command: %s@,@,%a@]" commandName usage ();
         exit 1

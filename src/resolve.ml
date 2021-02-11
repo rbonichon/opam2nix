@@ -19,11 +19,7 @@ let nix_digest_of_git_repo p =
     Printf.sprintf "opam2nix-%d-%d" (Unix.getpid ()) (unique_file_counter ())
   in
   let tempdir = Filename.concat (Filename.get_temp_dir_name ()) tempname in
-  Unix.mkdir tempdir 0o700;
-  let cleanup () =
-    rm_r tempdir;
-    Lwt.return_unit
-  in
+  Lwt_unix.mkdir tempdir 0o700 >>= fun () ->
   Lwt.finalize
     (fun () ->
       let r, w = Unix.pipe ~cloexec:true () in
@@ -38,7 +34,9 @@ let nix_digest_of_git_repo p =
             [ "git"; "-C"; p; "archive"; "HEAD" ])
         [ "tar"; "x"; "-C"; tempdir ]
       >>= fun () -> nix_digest_of_path tempdir)
-    cleanup
+    (fun () ->
+      rm_r tempdir;
+      Lwt.return_unit)
 
 let newer_versions available pkg =
   let newer a b =
@@ -199,11 +197,11 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
     | [] -> ()
     | newer_versions ->
         Format.eprintf
-          "@[<v>NOTE:@,\
+          "@[<hov>NOTE:@ \
            The following package versions are newer than the selected \
-           versions,@,\
-           but were not selected due to version constraints:@,\
-           %a@]@."
+           versions,@ \
+           but were not selected due to version constraints:@ \
+           @[<v 2>%a@]@]@."
           (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf pkg ->
                Format.fprintf ppf "@[- %s@]" (OpamPackage.to_string pkg)))
           newer_versions
@@ -328,7 +326,9 @@ let main idx args =
       | [ repo; commit ] -> parse_repo ~commit:(Some commit) repo
       | _ -> failwith ("Repo contains multiple `#` characters: " ^ repo)
     in
-    let op = if OpamStd.String.Map.mem key !repo_specs then "Replacing" else "Adding" in
+    let op =
+      if OpamStd.String.Map.mem key !repo_specs then "Replacing" else "Adding"
+    in
     Format.eprintf "%s repository: %s ...@." op key;
     repo_specs := !repo_specs |> OpamStd.String.Map.add key spec
   in
@@ -483,21 +483,17 @@ let main idx args =
       ~constrained_versions ~direct_definitions ()
   in
 
-  Printf.eprintf "Solving...\n";
-  flush stderr;
-  flush stderr;
+  Format.eprintf "Solving...@.";
 
-  let () =
-    match Solver.solve universe package_names with
-    | Error e ->
-        print_endline (Solver.diagnostics e);
-        exit 1
-    | Ok solution ->
-        let installed = Solver.packages_of_result solution in
-        Printf.eprintf "Selected packages:\n";
-        installed
-        |> List.iter (fun pkg ->
-               Printf.eprintf "- %s\n" (OpamPackage.to_string pkg));
-        write_solution ~external_constraints ~universe ~cache installed dest
-  in
-  ()
+  match Solver.solve universe package_names with
+  | Error e ->
+      print_endline (Solver.diagnostics e);
+      exit 1
+  | Ok solution ->
+     let installed = Solver.packages_of_result solution in
+     let open Format in
+      Format.eprintf "@[<v 2>Selected packages:@,%a@]@."
+        (Format.pp_print_list ~pp_sep:pp_print_cut
+           (fun ppf pkg -> fprintf ppf "@[<h>- %s@]" (OpamPackage.to_string pkg)))
+        installed;
+      write_solution ~external_constraints ~universe ~cache installed dest
