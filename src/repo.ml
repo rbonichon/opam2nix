@@ -35,7 +35,7 @@ type loaded_package = {
   repository_expr : unit -> Opam_metadata.opam_src Lwt.t;
   src_expr :
     Digest_cache.t -> (Nix_expr.t option, Digest_cache.error) Result.t Lwt.t;
-  loaded_url : Opam_metadata.url option;
+  loaded_url : Opam_metadata.Url.t option;
 }
 
 (* a direct package is passed on the commandline, and is

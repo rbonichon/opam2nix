@@ -1,7 +1,12 @@
-type url = [ `http of string * Digest_cache.opam_digest list ]
+module Url = struct
+  type t = Url of string * Digest_cache.opam_digest list
 
-let string_of_url : url -> string = function `http (url, _digest) -> url
+  let to_string (Url (u, _)) = u
 
+  let create u d = Url (u, d)
+
+  let ends_with ext (Url (u, _)) = Util.ends_with ext u
+end
 
 type unsupported_archive = [ `unsupported_archive of string ]
 
@@ -41,12 +46,15 @@ module Dependency = struct
           deps
     | Package formula ->
         (* of OpamTypes.formula *)
-        let string_of_filter : OpamTypes.filter OpamTypes.filter_or_constraint -> string = function
+        let string_of_filter :
+            OpamTypes.filter OpamTypes.filter_or_constraint -> string = function
           | Filter f -> OpamFilter.to_string f
           | Constraint (op, f) -> string_of_relop op ^ OpamFilter.to_string f
         in
         let string_of_atom :
-            OpamPackage.Name.t * OpamTypes.filter OpamTypes.filter_or_constraint OpamFormula.formula ->
+            OpamPackage.Name.t
+            * OpamTypes.filter OpamTypes.filter_or_constraint
+              OpamFormula.formula ->
             string =
          fun (name, formula) ->
           OpamPackage.Name.to_string name
@@ -72,18 +80,17 @@ module Importance = struct
 end
 
 module Requirement = struct
-  type t = Importance.t * Dependency.t 
+  type t = Importance.t * Dependency.t
+
   open Importance
-  let pp ppf = function
+
+  let _pp ppf = function
     | Required, dep -> Dependency.pp ppf dep
     | Optional, dep -> fprintf ppf "{%a}" Dependency.pp dep
 
-  let to_string t = Format.asprintf "%a" pp t
+  let optional d = (Optional, d)
 
-
-  let optional d = Optional, d
-
-  let required d = Required, d
+  let required d = (Required, d)
 
   (* let compare d1 d2 =
    *   match d1, d2 with
@@ -223,31 +230,10 @@ let add_nix_inputs ~(add_native : Importance.t -> string -> unit)
         ~doc:false ~default:false ~env:nixos_env formula
       |> add_formula Optional
 
-class dependency_map =
-  let map : Requirement.t list OpamPackage.Map.t ref =
-    ref OpamPackage.Map.empty
+let url urlfile : (Url.t, [> unsupported_archive ]) Result.t =
+  let url, checksums =
+    (OpamFile.URL.url urlfile, OpamFile.URL.checksum urlfile)
   in
-  let get_existing package_id =
-    try OpamPackage.Map.find package_id !map with Not_found -> []
-  in
-  object
-    method init_package package_id =
-      let existing = get_existing package_id in
-      map := OpamPackage.Map.add package_id existing !map
-
-    method add_dep package_id (dep : Requirement.t) =
-      let existing = get_existing package_id in
-      map := OpamPackage.Map.add package_id (dep :: existing) !map
-
-    method to_string =
-      let reqs_to_string reqs =
-        String.concat "," (List.map Requirement.to_string reqs)
-      in
-      OpamPackage.Map.to_string reqs_to_string !map
-  end
-
-let url urlfile : (url, [> unsupported_archive ]) Result.t =
-  let url, checksums = (OpamFile.URL.url urlfile, OpamFile.URL.checksum urlfile) in
   let OpamUrl.{ hash; transport; backend; _ } = url in
   let url_without_backend = OpamUrl.base_url url in
   let checksums =
@@ -262,7 +248,7 @@ let url urlfile : (url, [> unsupported_archive ]) Result.t =
       Error (`unsupported_archive "local path")
   | `http, _, None ->
       checksums
-      |> Result.map (fun checksums -> `http (url_without_backend, checksums))
+      |> Result.map (fun checksums -> Url.create url_without_backend checksums)
       (* drop the VCS portion *)
   | `http, _, Some _ -> Error (`unsupported_archive "http with fragment")
   | `rsync, transport, None ->
@@ -284,11 +270,10 @@ let load_opam path =
     failwith (Printf.sprintf "Invalid OPAM file: %s" path) );
   loaded |> OpamFormatUpgrade.opam_file
 
-let nix_of_url ~cache (url : url) :
-    (Nix_expr.t, Digest_cache.error) Result.t Lwt.t =
+let nix_of_url ~cache url : (Nix_expr.t, Digest_cache.error) Result.t Lwt.t =
   let open Nix_expr in
   match url with
-  | `http (src, checksums) ->
+  | Url.Url (src, checksums) ->
       Digest_cache.add src checksums cache
       |> Lwt.map (fun digest ->
              digest
@@ -329,8 +314,10 @@ let add_opam_deps ~add_dep (opam : OpamFile.OPAM.t) =
     [ OpamFile.OPAM.build opam; OpamFile.OPAM.install opam ];
   add_dep Optional (Dependency.Package (OpamFile.OPAM.depopts opam));
   add_dep Required (Dependency.Package (OpamFile.OPAM.depends opam));
-  let depexts = OpamFile.OPAM.depexts opam in
-  if depexts <> [] then add_dep Required (Dependency.External depexts)
+  match OpamFile.OPAM.depexts opam with
+  | [] -> ()
+  | depexts -> add_dep Required (Dependency.External depexts)
+
 
 module InputMap = struct
   include Nix_expr.AttrSet
@@ -344,13 +331,10 @@ end
 
 type opam_src = [ `Dir of Nix_expr.t | `File of Nix_expr.t ]
 
-let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
-    Nix_expr.t =
-  let name = OpamPackage.name pkg |> OpamPackage.Name.to_string in
-  let version = OpamPackage.version pkg |> OpamPackage.Version.to_string in
+let nix_of_opam ?url ?src ~pkg ~(opam_src : opam_src) opam =
+  let name = OpamPackage.(name pkg |> Name.to_string) in
+  let version = OpamPackage.(version pkg |> Version.to_string) in
   let adder r importance name = r := InputMap.add name importance !r in
-
-  deps#init_package pkg;
 
   let opam_inputs = ref InputMap.empty in
   let nix_deps = ref InputMap.empty in
@@ -363,13 +347,8 @@ let nix_of_opam ~pkg ~deps ~(opam_src : opam_src) ~opam ~src ~url () :
 
   add_opam_deps ~add_dep opam;
 
-  let url_ends_with ext =
-    match url with
-    | Some (`http (url, _)) -> Util.ends_with ext url
-    | None -> false
-  in
-
-  if url_ends_with ".zip" then add_native Required "unzip";
+  if Option.is_some url && Url.ends_with ".zip" (Option.get url) then
+    add_native Required "unzip";
 
   let property_of_input src (name, importance) : Nix_expr.t =
     match importance with

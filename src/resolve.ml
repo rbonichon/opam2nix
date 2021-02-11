@@ -207,7 +207,6 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
           newer_versions
   in
 
-  let deps = new Opam_metadata.dependency_map in
   let open Nix_expr in
   (* download all new packages (Digest_cache usage will automatically throttle *)
   let new_packages =
@@ -223,16 +222,17 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
                     src
                     |> Result.get_exn (fun e ->
                            let url =
-                             Option.to_string Opam_metadata.string_of_url
+                             Option.to_string Opam_metadata.Url.to_string 
                                loaded_url
                            in
                            Printf.sprintf "%s (%s)"
                              (Digest_cache.string_of_error e)
                              url)
                   in
+                  let url = loaded_url in 
                   ( OpamPackage.name pkg |> Name.to_string,
-                    nix_of_opam ~deps ~pkg ~opam:loaded_opam ~url:loaded_url
-                      ~src ~opam_src:repository_expr () )))
+                    nix_of_opam ~pkg ?url
+                      ?src ~opam_src:repository_expr loaded_opam )))
     |> Lwt_main.run
   in
 
