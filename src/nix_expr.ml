@@ -38,6 +38,8 @@ let lit s = Lit s
 
 let rec_attrs l = Rec_attrs (attrset l)
 
+let optional name e  = Property_or (e, name, Null)
+
 let apply_replacements (replacements : (Str.regexp * string) list) (s : string)
     : string =
   List.fold_left

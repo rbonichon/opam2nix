@@ -36,5 +36,7 @@ val call : t list -> t
 
 val lit : string -> t
 
+val optional : string -> t -> t
+
 val write_file : filename:string -> t -> unit
 (** [write_file] *)
