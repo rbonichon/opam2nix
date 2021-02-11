@@ -197,11 +197,9 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
     | [] -> ()
     | newer_versions ->
         Format.eprintf
-          "@[<hov>NOTE:@ \
-           The following package versions are newer than the selected \
-           versions,@ \
-           but were not selected due to version constraints:@ \
-           @[<v 2>%a@]@]@."
+          "@[<hov>NOTE:@ The following package versions are newer than the \
+           selected versions,@ but were not selected due to version \
+           constraints:@ @[<v 2>%a@]@]@."
           (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf pkg ->
                Format.fprintf ppf "@[- %s@]" (OpamPackage.to_string pkg)))
           newer_versions
@@ -222,17 +220,17 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
                     src
                     |> Result.get_exn (fun e ->
                            let url =
-                             Option.to_string Opam_metadata.Url.to_string 
+                             Option.to_string Opam_metadata.Url.to_string
                                loaded_url
                            in
                            Printf.sprintf "%s (%s)"
                              (Digest_cache.string_of_error e)
                              url)
                   in
-                  let url = loaded_url in 
+                  let url = loaded_url in
                   ( OpamPackage.name pkg |> Name.to_string,
-                    nix_of_opam ~pkg ?url
-                      ?src ~opam_src:repository_expr loaded_opam )))
+                    nix_of_opam ~pkg ?url ?src ~opam_src:repository_expr
+                      loaded_opam )))
     |> Lwt_main.run
   in
 
@@ -296,6 +294,17 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
 let is_likely_path p =
   String.contains p '.' && Str.string_match (Str.regexp ".*opam$") p 0
 
+let parse_repo repo_id =
+  let parse_repo ic = Scanf.bscanf ic "%s@/%s@#" (fun s1 s2 -> (s1, s2)) in
+  let parse_commit ic = Scanf.bscanf ic "%s" (fun s -> s) in
+  match
+    Scanf.sscanf repo_id "%r%r" parse_repo parse_commit (fun x y -> (x, y))
+  with
+  | (_, ""), _ -> failwith ("Can't parse github repo from: " ^ repo_id)
+  | (github_owner, github_name), commit ->
+      let spec_commit = if commit = "" then None else Some commit in
+      { github_owner; github_name; spec_commit }
+
 let main idx args =
   let dest = ref "opam-selection.nix" in
   let detect_from = ref "" in
@@ -312,20 +321,8 @@ let main idx args =
          })
   in
 
-  let parse_repo ~commit repo =
-    match repo |> String.split_on_char '/' with
-    | [ github_owner; github_name ] ->
-        { github_owner; github_name; spec_commit = commit }
-    | _ -> failwith ("Can't parse github repo from: " ^ repo)
-  in
-
   let set_repo key repo =
-    let spec =
-      match repo |> String.split_on_char '#' with
-      | [ repo ] -> parse_repo ~commit:None repo
-      | [ repo; commit ] -> parse_repo ~commit:(Some commit) repo
-      | _ -> failwith ("Repo contains multiple `#` characters: " ^ repo)
-    in
+    let spec = parse_repo repo in
     let op =
       if OpamStd.String.Map.mem key !repo_specs then "Replacing" else "Adding"
     in
@@ -490,10 +487,10 @@ let main idx args =
       print_endline (Solver.diagnostics e);
       exit 1
   | Ok solution ->
-     let installed = Solver.packages_of_result solution in
-     let open Format in
+      let installed = Solver.packages_of_result solution in
+      let open Format in
       Format.eprintf "@[<v 2>Selected packages:@,%a@]@."
-        (Format.pp_print_list ~pp_sep:pp_print_cut
-           (fun ppf pkg -> fprintf ppf "@[<h>- %s@]" (OpamPackage.to_string pkg)))
+        (Format.pp_print_list ~pp_sep:pp_print_cut (fun ppf pkg ->
+             fprintf ppf "@[<h>- %s@]" (OpamPackage.to_string pkg)))
         installed;
       write_solution ~external_constraints ~universe ~cache installed dest
