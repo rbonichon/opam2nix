@@ -1,12 +1,9 @@
-module Name = OpamPackage.Name
-module Version = OpamPackage.Version
 module OPAM = OpamFile.OPAM
 module Zi = Opam_0install
-open Repo
 
 (* external constraints are the preselected boundaries of
  * the selection - what repos and compiler we're using *)
-type external_constraints = { ocaml_version : Version.t; repos : Repo.t list }
+type external_constraints = { ocaml_version : OpamPackage.Version.t; repos : Repo.t list }
 
 type error = [ Opam_metadata.unsupported_archive | `unavailable of string ]
 
@@ -16,8 +13,8 @@ type universe = {
     OpamVariable.Full.t ->
     OpamVariable.variable_contents option;
   repos : Repo.t list;
-  mutable packages : (loaded_package, error) result OpamPackage.Map.t;
-  constrained_versions : Version.t Name.Map.t;
+  mutable packages : (Repo.loaded_package, error) result OpamPackage.Map.t;
+  constrained_versions : OpamPackage.Version.t OpamPackage.Name.Map.t;
 }
 
 let build_universe ~external_constraints ~base_packages ~constrained_versions
@@ -32,13 +29,13 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
         {
           ocaml_version;
           packages =
-            Name.Map.of_list
+            OpamPackage.Name.Map.of_list
               ( [
                   ( name,
                     Installed
                       { path = None; (* not yet known *)
                         version = Some version } );
-                  ( Name.of_string "ocaml",
+                  ( OpamPackage.Name.of_string "ocaml",
                     Installed
                       {
                         path = None;
@@ -57,10 +54,11 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
   let initial_packages =
     direct_definitions
     |> List.map (fun package ->
+           let open Repo in 
            let name = package.direct_name in
            let version =
              package.direct_version
-             |> Option.value ~default:(Version.of_string "development")
+             |> Option.value ~default:(OpamPackage.Version.of_string "development")
            in
            ( OpamPackage.create name version,
              Ok
@@ -75,7 +73,7 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
                              (Nix_expr.Call
                                 [
                                   Lit "self.directSrc";
-                                  Nix_expr.str (Name.to_string name);
+                                  Nix_expr.str (OpamPackage.Name.to_string name);
                                 ]))));
                  repository_expr =
                    (fun () ->
@@ -89,10 +87,10 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
     lookup_var;
     repos = external_constraints.repos;
     packages = initial_packages;
-    constrained_versions = Name.Map.of_list constrained_versions;
+    constrained_versions = OpamPackage.Name.Map.of_list constrained_versions;
   }
 
-let load_package ~url pkg : loaded_package =
+let load_package ~url pkg : Repo.loaded_package =
   let src_expr cache =
     url
     |> Option.map (fun url ->
@@ -109,7 +107,7 @@ let load_package ~url pkg : loaded_package =
                (Call
                   [
                     Id "repoPath";
-                    PropertyPath (Id "repos", [ repo_key pkg.repo; "src" ]);
+                    PropertyPath (Id "repos", [ Repo.repo_key pkg.repo; "src" ]);
                     Attrs
                       (AttrSet.of_list
                          [ ("package", str pkg.rel_path); ("hash", str digest) ]);
@@ -118,11 +116,11 @@ let load_package ~url pkg : loaded_package =
   { loaded_opam = pkg.opam; loaded_url = url; src_expr; repository_expr }
 
 let check_availability ~lookup_var pkg =
-  let available_filter = OPAM.available pkg.opam in
+  let available_filter = OPAM.available pkg.Repo.opam in
   let available =
     try
       Ok
-        ( pkg.package.name <> Name.of_string "opam"
+        ( pkg.package.name <> OpamPackage.Name.of_string "opam"
         && OpamFilter.eval_to_bool (lookup_var pkg.package) available_filter )
     with e -> Error (`unavailable (Printexc.to_string e))
   in
@@ -146,7 +144,7 @@ module Context : Zi.S.CONTEXT with type t = universe = struct
     | `unsupported_archive s -> Fmt.pf f "Unsupported archive: %s" s
 
   let check_url pkg =
-    pkg.url |> Option.map Opam_metadata.url |> Option.sequence_result
+    pkg.Repo.url |> Option.map Opam_metadata.url |> Option.sequence_result
 
   let candidates :
       t ->
@@ -154,16 +152,17 @@ module Context : Zi.S.CONTEXT with type t = universe = struct
       (OpamPackage.Version.t * (OpamFile.OPAM.t, rejection) Stdlib.result) list
       =
    fun env name ->
-    let name_str = Name.to_string name in
+    let name_str = OpamPackage.Name.to_string name in
     let () =
+      let open Repo in 
       env.repos
       |> List.concat_map (fun repo -> Repo.list_package repo name_str)
       (* Drop duplicates from multiple repos *)
       |> List.filter (fun pkg ->
              not (OpamPackage.Map.mem pkg.package env.packages))
       |> List.filter (fun pkg ->
-             Name.Map.find_opt pkg.package.name env.constrained_versions
-             |> Option.map (Version.equal pkg.package.version)
+             OpamPackage.Name.Map.find_opt pkg.package.name env.constrained_versions
+             |> Option.map (OpamPackage.Version.equal pkg.package.version)
              (* OK if versions equal *)
              |> Option.value ~default:true
              (* or if there is no constraint on the version *))
@@ -180,10 +179,10 @@ module Context : Zi.S.CONTEXT with type t = universe = struct
 
     OpamPackage.Map.bindings env.packages
     |> List.filter_map (fun (k, v) ->
-           if Name.equal (OpamPackage.name k) name then
-             Some (k.version, v |> Result.map (fun loaded -> loaded.loaded_opam))
+           if OpamPackage.Name.equal (OpamPackage.name k) name then
+             Some (k.version, v |> Result.map (fun loaded -> loaded.Repo.loaded_opam))
            else None)
-    |> List.sort (fun (va, _) (vb, _) -> Version.compare vb va)
+    |> List.sort (fun (va, _) (vb, _) -> OpamPackage.Version.compare vb va)
 
   (* Not supported *)
   let user_restrictions :
