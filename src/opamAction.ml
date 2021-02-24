@@ -45,7 +45,7 @@ let prepare_package_build env opam nv dir =
         (OpamFilename.Base.to_string basename)
   in
 
-  if OpamStateConfig.(!r.dryrun) || OpamClientConfig.(!r.fake) then
+  if OpamStateConfig.(!r.dryrun) then
     let open OpamProcess.Job.Op in 
     iter_patches print_apply patches @@| fun _ -> None
   else
