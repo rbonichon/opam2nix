@@ -104,7 +104,7 @@ let load_package ~url pkg : Repo.loaded_package =
   in
   let repository_expr () =
     Repo.nix_digest_of_path (Repo.full_path pkg)
-    |> Lwt.map (fun (`sha256 digest) ->
+    |> Lwt.map (fun (Digest_cache.Sha256 digest) ->
            let digest = "sha256:" ^ digest in
            Nix_expr.(
              Dir

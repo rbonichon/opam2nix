@@ -248,7 +248,7 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
     ]
   in
 
-  let sha256 digest = Lwt_main.run digest |> fun (`sha256 x) -> x in
+  let sha256 digest = Lwt_main.run digest |> fun (Digest_cache.Sha256 x) -> x in
 
   let repo_attrsets =
     external_constraints.repos

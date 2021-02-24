@@ -283,7 +283,7 @@ let nix_of_url ~cache url : (Nix_expr.t, Digest_cache.error) Result.t Lwt.t =
       Digest_cache.add src checksums cache
       |> Lwt.map (fun digest ->
              digest
-             |> Result.map (function `sha256 sha256 -> ("sha256", str sha256))
+             |> Result.map (function Digest_cache.Sha256 sha256 -> ("sha256", str sha256))
              |> Result.map (fun digest ->
                     call
                       [

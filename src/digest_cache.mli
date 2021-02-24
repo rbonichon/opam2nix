@@ -11,7 +11,7 @@ type error =
   | `download_failed of key
   | `error of key ]
 
-type nix_digest = [ `sha256 of key ]
+type nix_digest = Sha256 of key 
 
 type state = {
   digests : (nix_digest, error) result Lwt.t Cache.t;

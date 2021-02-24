@@ -3,7 +3,7 @@ module Cache = OpamStd.String.Map
 
 type key = string
 
-type nix_digest = [ `sha256 of string ]
+type nix_digest = Sha256 of string 
 
 type checksum_mismatch = [ `checksum_mismatch of string ]
 
@@ -53,7 +53,7 @@ let value_of_json : JSON.t -> nix_digest option = function
       match (val_type, val_digest) with
       | Some "sha256", Some digest | None, Some digest ->
           (* assume sha256 *)
-          Some (`sha256 digest)
+          Some (Sha256 digest)
       | _other ->
           Printf.eprintf "Unknown digest value; ignoring: %s\n"
             (JSON.to_string (`Assoc properties));
@@ -62,7 +62,7 @@ let value_of_json : JSON.t -> nix_digest option = function
       failwith
         ("Expected digest value to be an object, got " ^ JSON.to_string other)
 
-let json_of_nix_digest (`sha256 digest) = `Assoc [ ("digest", `String digest) ]
+let json_of_nix_digest (Sha256 digest) = `Assoc [ ("digest", `String digest) ]
 
 let key_of_opam_digest digest =
   (digest |> OpamHash.kind |> OpamHash.string_of_kind |> String.lowercase_ascii)
@@ -203,4 +203,4 @@ let add url opam_digests cache : (nix_digest, error) Result.t Lwt.t =
       Download.fetch ctx ~dest:dest_channel url
       |> Lwt.map (Result.bind (fun () -> check_digests opam_digests dest))
       >>= (fun () -> sha256_of_path dest)
-      |> Lwt_result.map (fun digest -> `sha256 digest))
+      |> Lwt_result.map (fun digest -> Sha256 digest))

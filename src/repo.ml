@@ -127,4 +127,4 @@ let nix_digest_of_path p =
            [ "nix-store"; "--dump"; p ])
       |> Lwt.map (fun (output, ()) -> output))
     hash_cmd
-  |> Lwt.map (fun hash -> `sha256 hash)
+  |> Lwt.map (fun hash -> Digest_cache.Sha256 hash)

@@ -14,7 +14,7 @@ type t = {
 
 val repo_key : t -> string
 
-val nix_digest_of_path : string -> [> `sha256 of string ] Lwt.t
+val nix_digest_of_path : string -> Digest_cache.nix_digest Lwt.t
 (** [nix_digest_of_path] *)
 
 type direct_package = {

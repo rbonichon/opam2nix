@@ -9,7 +9,7 @@ let print_var = function
 let test_path env prefix name ?scope expected =
 	name >:: (fun _ ->
 		let scope = scope |> Option.map Name.of_string in
-		assert_equal ~printer:print_var (Some (S expected)) (Vars.path_var ~env ~prefix ~scope name)
+		assert_equal ~printer:print_var (Some (S expected)) (Vars.path_var ~env ~prefix ?scope name)
 	)
 
 let suite = "Util" >:::
