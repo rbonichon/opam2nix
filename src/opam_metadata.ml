@@ -290,7 +290,6 @@ let nix_of_url ~cache url : (Nix_expr.t, Digest_cache.error) Result.t Lwt.t =
                         lit "pkgs.fetchurl"; attrs [ ("url", str src); digest ];
                       ]))
 
-
 module InputMap = struct
   include Nix_expr.AttrSet
 
@@ -367,8 +366,8 @@ module Dependencies = struct
                         Hashtbl.remove nix_deps (may_need_pkg m);
                         Hashtbl.replace nix_deps requirement ()
                     | Optional _ -> ())
-                        (* if not @@ Hashtbl.mem nix_deps (require_pkg m) then
-                         *   Hashtbl.replace nix_deps requirement ()) *)
+                  (* if not @@ Hashtbl.mem nix_deps (require_pkg m) then
+                   *   Hashtbl.replace nix_deps requirement ()) *)
                   pkg_set)
               externals)
     in
@@ -431,7 +430,9 @@ let add_opam_dependencies deps opam =
   Dependencies.requires deps (Dependency.Package (OpamFile.OPAM.depends opam));
   match OpamFile.OPAM.depexts opam with
   | [] -> ()
-  | depexts -> Dependencies.requires deps (Dependency.External (filter_nixos_dependencies depexts))
+  | depexts ->
+      Dependencies.requires deps
+        (Dependency.External (filter_nixos_dependencies depexts))
 
 let opam2nix ?url ?src ~pkg ~opam_src opam =
   let name = OpamPackage.(name pkg |> Name.to_string) in
@@ -468,10 +469,10 @@ let opam2nix ?url ?src ~pkg ~opam_src opam =
     List.sort (fun a b -> String.compare (name_of a) (name_of b)) nix_deps
     |> List.map (property_of_input pkgs)
   in
-  
+
   (* TODO: separate build-only deps from propagated *)
-  Nix_expr.opam_attrset
-    ~pname:name ~version ?src ~opam_inputs ~opam_src ~build_inputs
+  Nix_expr.opam_attrset ~pname:name ~version ?src ~opam_inputs ~opam_src
+    ~build_inputs
 
 let nix_of_opam ?url ?src ~pkg ~opam_src opam =
   let nix_e = opam2nix ?url ?src ~pkg ~opam_src opam in
@@ -513,11 +514,11 @@ let nix_of_opam ?url ?src ~pkg ~opam_src opam =
     |> List.map (property_of_input (Id "pkgs"))
   in
 
-  let nix_e_res = 
-  Nix_expr.opam_attrset
-    ~pname:name ~version ?src ~opam_inputs ~opam_src ~build_inputs:nix_deps
-
+  let nix_e_res =
+    Nix_expr.opam_attrset ~pname:name ~version ?src ~opam_inputs ~opam_src
+      ~build_inputs:nix_deps
   in
+
   Format.printf "Writing nix attrset files %s@." name;
   Nix_expr.write_file ~filename:"nix_refactor.nix" nix_e;
   Nix_expr.write_file ~filename:"nix_orig.nix" nix_e_res;

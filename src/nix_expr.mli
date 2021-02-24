@@ -48,8 +48,6 @@ val opam_attrset :
   opam_inputs:t AttrSet.t ->
   opam_src:opam_src ->
   t
-    
-
 
 val write_file : filename:string -> t -> unit
 (** [write_file] *)

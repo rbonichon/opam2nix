@@ -1,11 +1,11 @@
 (** [Url] *)
-module Url: sig
+module Url : sig
   type t = private Url of string * OpamHash.t list
+
   val to_string : t -> string
+
   val create : string -> OpamHash.t list -> t
-end 
-
-
+end
 
 type unsupported_archive = [ `unsupported_archive of OpamTypes.file_name ]
 
@@ -23,11 +23,9 @@ val nix_of_url :
 val url : OpamFile.URL.t -> (Url.t, [> unsupported_archive ]) result
 (** [url] *)
 
-
 (** [Requirement] *)
 module Requirement : sig
   type t
-
 end
 
 val nixify :
@@ -38,5 +36,3 @@ val nixify :
   OpamFile.OPAM.t ->
   Nix_expr.t
 (** [nix_of_opam] *)
-
-

@@ -53,7 +53,9 @@ let run (spawn : Lwt_process.command -> 'proc) ?(print = true)
   Lwt.try_bind
     (fun () -> block proc)
     (fun result ->
-      proc#close |> Lwt.map (Internal.result_of_status ~cmd) |> Lwt.map (join result))
+      proc#close
+      |> Lwt.map (Internal.result_of_status ~cmd)
+      |> Lwt.map (join result))
     (fun err -> proc#close >>= fun _ -> Lwt.fail err)
 
 let exec_r ?stdin ?stderr = Lwt_process.open_process_in ?stdin ?stderr

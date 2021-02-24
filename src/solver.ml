@@ -3,7 +3,10 @@ module Zi = Opam_0install
 
 (* external constraints are the preselected boundaries of
  * the selection - what repos and compiler we're using *)
-type external_constraints = { ocaml_version : OpamPackage.Version.t; repos : Repo.t list }
+type external_constraints = {
+  ocaml_version : OpamPackage.Version.t;
+  repos : Repo.t list;
+}
 
 type error = [ Opam_metadata.unsupported_archive | `unavailable of string ]
 
@@ -34,7 +37,7 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
                   ( name,
                     Installed
                       { path = None; (* not yet known *)
-                        version = Some version } );
+                                     version = Some version } );
                   ( OpamPackage.Name.of_string "ocaml",
                     Installed
                       {
@@ -54,11 +57,12 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
   let initial_packages =
     direct_definitions
     |> List.map (fun package ->
-           let open Repo in 
+           let open Repo in
            let name = package.direct_name in
            let version =
              package.direct_version
-             |> Option.value ~default:(OpamPackage.Version.of_string "development")
+             |> Option.value
+                  ~default:(OpamPackage.Version.of_string "development")
            in
            ( OpamPackage.create name version,
              Ok
@@ -154,14 +158,15 @@ module Context : Zi.S.CONTEXT with type t = universe = struct
    fun env name ->
     let name_str = OpamPackage.Name.to_string name in
     let () =
-      let open Repo in 
+      let open Repo in
       env.repos
       |> List.concat_map (fun repo -> Repo.list_package repo name_str)
       (* Drop duplicates from multiple repos *)
       |> List.filter (fun pkg ->
              not (OpamPackage.Map.mem pkg.package env.packages))
       |> List.filter (fun pkg ->
-             OpamPackage.Name.Map.find_opt pkg.package.name env.constrained_versions
+             OpamPackage.Name.Map.find_opt pkg.package.name
+               env.constrained_versions
              |> Option.map (OpamPackage.Version.equal pkg.package.version)
              (* OK if versions equal *)
              |> Option.value ~default:true
@@ -180,7 +185,9 @@ module Context : Zi.S.CONTEXT with type t = universe = struct
     OpamPackage.Map.bindings env.packages
     |> List.filter_map (fun (k, v) ->
            if OpamPackage.Name.equal (OpamPackage.name k) name then
-             Some (k.version, v |> Result.map (fun loaded -> loaded.Repo.loaded_opam))
+             Some
+               ( k.version,
+                 v |> Result.map (fun loaded -> loaded.Repo.loaded_opam) )
            else None)
     |> List.sort (fun (va, _) (vb, _) -> OpamPackage.Version.compare vb va)
 

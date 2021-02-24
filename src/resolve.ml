@@ -229,8 +229,8 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
                   in
                   let url = loaded_url in
                   ( OpamPackage.name pkg |> Name.to_string,
-                    nixify ~pkg ?url ?src ~opam_src:repository_expr
-                      loaded_opam )))
+                    nixify ~pkg ?url ?src ~opam_src:repository_expr loaded_opam
+                  )))
     |> Lwt_main.run
   in
 
@@ -381,8 +381,7 @@ let main idx args =
         &&
         let file_exists = Sys.file_exists pkg in
         if not file_exists then
-          Log.warn
-            "%s looks like a path but does not exist on disk@." pkg;
+          Log.warn "%s looks like a path but does not exist on disk@." pkg;
         file_exists)
       !packages
   in

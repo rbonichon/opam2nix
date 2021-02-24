@@ -14,8 +14,7 @@ to avoid a full dependency on opam-client *)
 
 let log ?level fmt = OpamConsole.log ?level "ACTION" fmt
 
-open OpamFilename.Op 
-
+open OpamFilename.Op
 
 (* Prepare the package build:
    * apply the patches
@@ -26,9 +25,9 @@ let prepare_package_build env opam nv dir =
   let rec iter_patches f = function
     | [] -> OpamProcess.Job.Op.Done []
     | (patchname, filter) :: rest ->
-       if OpamFilter.opt_eval_to_bool env filter then
-         let open OpamFilename.Op in
-         let open OpamProcess.Job.Op in 
+        if OpamFilter.opt_eval_to_bool env filter then
+          let open OpamFilename.Op in
+          let open OpamProcess.Job.Op in
           OpamFilename.patch (dir // OpamFilename.Base.to_string patchname) dir
           @@+ function
           | None -> iter_patches f rest
@@ -46,7 +45,7 @@ let prepare_package_build env opam nv dir =
   in
 
   if OpamStateConfig.(!r.dryrun) then
-    let open OpamProcess.Job.Op in 
+    let open OpamProcess.Job.Op in
     iter_patches print_apply patches @@| fun _ -> None
   else
     let subst_patches, subst_others =
@@ -70,7 +69,7 @@ let prepare_package_build env opam nv dir =
       OpamProcess.make_command_text (OpamPackage.Name.to_string nv.name) "patch"
     in
 
-    let open OpamProcess.Job.Op in 
+    let open OpamProcess.Job.Op in
     OpamProcess.Job.with_text text
     @@ iter_patches
          (fun base ->

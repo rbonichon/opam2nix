@@ -164,6 +164,5 @@ let lookup env key =
   in
   Log.debug " -> %s\n"
     (Option.to_string OpamVariable.string_of_variable_contents result);
-  if Option.is_none result then
-    Log.warn "Opam var %s not found...@." keystr;
+  if Option.is_none result then Log.warn "Opam var %s not found...@." keystr;
   result

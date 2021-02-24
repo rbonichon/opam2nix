@@ -1,7 +1,5 @@
-
 val without_trailing : string -> string -> string option
 (** [without_trailing] *)
-
 
 val getenv_opt : string -> string option
 (** [getenv_opt] *)
@@ -20,4 +18,3 @@ val without_leading : string -> string -> string option
 
 val rm_r : string -> unit
 (** [rec] *)
-

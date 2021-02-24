@@ -38,7 +38,4 @@ let rec rm_r root =
            if Sys.is_directory path then rm_r path else Unix.unlink path);
     Unix.rmdir root )
 
-
-
 let getenv_opt name = try Some (Unix.getenv name) with Not_found -> None
-

@@ -26,7 +26,7 @@ type direct_package = {
 
 type loaded_package = {
   loaded_opam : OpamFile.OPAM.t;
-  repository_expr : unit ->  Nix_expr.opam_src Lwt.t;
+  repository_expr : unit -> Nix_expr.opam_src Lwt.t;
   src_expr :
     Digest_cache.t -> (Nix_expr.t option, Digest_cache.error) result Lwt.t;
   loaded_url : Opam_metadata.Url.t option;
@@ -48,5 +48,3 @@ val list_package : t -> string -> package list
 
 val git_url : spec -> string
 (** [git_url] *)
-
-

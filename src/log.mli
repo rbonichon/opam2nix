@@ -8,11 +8,8 @@ val warn : 'a t
 
 val error : 'a t
 
-
 val verbose : unit -> bool
 (** [verbose] *)
 
-
-
+val set_verbose : bool -> unit
 (** [set_verbose] *)
-val set_verbose: bool -> unit ;;

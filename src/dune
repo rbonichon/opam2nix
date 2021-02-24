@@ -4,10 +4,8 @@
  (name opam2nix)
  (public_name opam2nix)
  (modules :standard \ main version_ml)
- (libraries str unix yojson
-   opam-state opam-0install
-   lwt lwt.unix curl curl.lwt
-   fileutils))
+ (libraries str unix yojson opam-state opam-0install lwt lwt.unix curl
+   curl.lwt fileutils))
 
 (executable
  (name main)
@@ -25,6 +23,6 @@
  (deps
   ../VERSION
   (universe) ; depends on (possibly-absent) files in .git, but dune doesn't like that
- )
+  )
  (action
   (run ./version_ml.exe %{target})))
