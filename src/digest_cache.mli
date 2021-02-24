@@ -13,13 +13,12 @@ type error =
 
 type nix_digest = Sha256 of key
 
-type state = {
-  digests : (nix_digest, error) result Lwt.t Cache.t;
+type t = {
+  mutable digests : (nix_digest, error) result Lwt.t Cache.t;
   path : key;
-  download_ctx : Download.Ctx.t option;
+  mutable download_ctx : Download.Ctx.t option;
 }
 
-type t = state ref
 
 val add : key -> opam_digest list -> t -> (nix_digest, error) result Lwt.t
 (** [add] *)

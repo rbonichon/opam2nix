@@ -26,14 +26,12 @@ let string_of_error : error -> string = function
 
 type opam_digest = OpamHash.t
 
-type state = {
-  digests : (nix_digest, error) Result.t Lwt.t Cache.t;
+type t = {
+  mutable digests : (nix_digest, error) Result.t Lwt.t Cache.t;
   path : string;
-  download_ctx : Download.Ctx.t option;
+  mutable download_ctx : Download.Ctx.t option;
       (* automatically populated on `fetch` and discarded on save *)
 }
-
-type t = state ref
 
 type value_partial = { val_type : string option; val_digest : string option }
 
@@ -105,20 +103,20 @@ let cache_of_json = function
 
 let load path : nix_digest Cache.t = JSON.from_file path |> cache_of_json
 
-let try_load path : t =
+let try_load path =
   let digests =
     if Sys.file_exists path then
       load path |> Cache.map (fun value -> Lwt.return (Ok value))
     else Cache.empty
   in
-  ref { digests; path; download_ctx = None }
+  { digests; path; download_ctx = None }
 
 let save cache =
-  !cache.download_ctx
+  cache.download_ctx
   |> Option.may (fun ctx ->
          Download.Ctx.destroy ctx;
-         cache := { !cache with download_ctx = None });
-  let path = !cache.path in
+         cache.download_ctx <- None);
+  let path = cache.path in
   let tmp = path ^ ".tmp" in
   let digests : nix_digest Cache.t Lwt.t =
     Cache.fold
@@ -127,7 +125,7 @@ let save cache =
         Lwt.bind value (function
           | Ok digest -> acc |> Lwt.map (Cache.add key digest)
           | Error _ -> acc (* drop from cache *)))
-      !cache.digests (Lwt.return Cache.empty)
+      cache.digests (Lwt.return Cache.empty)
   in
   digests |> Lwt.map json_of_cache |> fun v ->
   Lwt.bind v (fun json ->
@@ -163,10 +161,10 @@ let check_digests (opam_digest : opam_digest list) path :
   in
   check opam_digest
 
-let add_custom cache ~(keys : string list)
+let add_custom (cache : t) ~(keys : string list)
     (block : unit -> (nix_digest, error) Result.t Lwt.t) :
     (nix_digest, error) Result.t Lwt.t =
-  let digests = !cache.digests in
+  let digests = cache.digests in
   let rec find_first = function
     | [] ->
         Log.debug "digest_cache no key found in: %s\n" (String.concat "|" keys);
@@ -180,7 +178,7 @@ let add_custom cache ~(keys : string list)
       Log.debug "digest_cache: adding key %s\n" key;
       Cache.add key value map
     in
-    cache := { !cache with digests = List.fold_left add !cache.digests keys }
+    cache.digests <- List.fold_left add cache.digests keys
   in
 
   find_first keys
@@ -190,14 +188,14 @@ let add_custom cache ~(keys : string list)
          result)
 
 let ensure_ctx cache =
-  !cache.download_ctx
-  |> Option.default_fn (fun () ->
-         let ctx = Download.Ctx.init () in
-         cache := { !cache with download_ctx = Some ctx };
-         ctx)
+  match cache.download_ctx with
+  | Some c -> c
+  | None ->
+      let ctx = Download.Ctx.init () in
+      cache.download_ctx <- Some ctx;
+      ctx
 
 let add url opam_digests cache : (nix_digest, error) Result.t Lwt.t =
-  let open Lwt_result.Infix in
   let keys = List.map key_of_opam_digest opam_digests in
   add_custom cache ~keys (fun () ->
       let dest, dest_channel = Filename.open_temp_file "opam2nix" "archive" in
