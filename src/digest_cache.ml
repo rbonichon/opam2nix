@@ -169,15 +169,15 @@ let add_custom cache ~(keys : string list)
   let digests = !cache.digests in
   let rec find_first = function
     | [] ->
-        Util.debug "digest_cache no key found in: %s\n" (String.concat "|" keys);
+        Log.debug "digest_cache no key found in: %s\n" (String.concat "|" keys);
         None
     | key :: keys ->
         (try Some (Cache.find key digests) with Not_found -> find_first keys)
-        |> Option.tap (fun _ -> Util.debug "digest_cache: found key: %s\n" key)
+        |> Option.tap (fun _ -> Log.debug "digest_cache: found key: %s\n" key)
   in
   let update_cache value =
     let add map key =
-      Util.debug "digest_cache: adding key %s\n" key;
+      Log.debug "digest_cache: adding key %s\n" key;
       Cache.add key value map
     in
     cache := { !cache with digests = List.fold_left add !cache.digests keys }

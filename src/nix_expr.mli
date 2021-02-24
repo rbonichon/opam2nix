@@ -1,5 +1,5 @@
+module AttrSet : OpamStd.MAP with type key = string
 (** [AttrSet] *)
-module AttrSet : OpamStd.MAP with type key = string 
 
 type t =
   | String of string list
@@ -37,6 +37,19 @@ val call : t list -> t
 val lit : string -> t
 
 val optional : string -> t -> t
+
+type opam_src = Dir of t | File of t
+
+val opam_attrset :
+  ?src:t ->
+  ?build_inputs:t list ->
+  pname:string ->
+  version:string ->
+  opam_inputs:t AttrSet.t ->
+  opam_src:opam_src ->
+  t
+    
+
 
 val write_file : filename:string -> t -> unit
 (** [write_file] *)

@@ -1,11 +1,6 @@
-val verbose : unit -> bool
-(** [verbose] *)
 
 val without_trailing : string -> string -> string option
 (** [without_trailing] *)
-
-val debug : ('a, out_channel, unit) format -> 'a
-(** [debug] *)
 
 
 val getenv_opt : string -> string option
@@ -26,5 +21,3 @@ val without_leading : string -> string -> string option
 val rm_r : string -> unit
 (** [rec] *)
 
-val _verbose : bool ref
-(** [_verbose] *)

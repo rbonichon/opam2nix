@@ -168,7 +168,7 @@ let init_variables () = add_base_variables (nixos_vars ())
 let add_nix_inputs ~add_native ~(add_opam : Importance.t -> string -> unit)
     (importance, dependency) =
   let nixos_env = Vars.simple_lookup ~vars:(nixos_vars ()) in
-  Util.debug "Adding dependency: %s\n" (Dependency.to_string dependency);
+  Log.debug "Adding dependency: %s\n" (Dependency.to_string dependency);
   let desc =
     match importance with
     | Importance.Required -> "dep"
@@ -196,10 +196,10 @@ let add_nix_inputs ~add_native ~(add_opam : Importance.t -> string -> unit)
       let importance, deps =
         match Util.filter_map (apply_filters nixos_env) externals with
         | [] ->
-            Util.debug
+            Log.debug
               "  Note: package has depexts, but none of them `nixos`:\n    %s\n"
               (Dependency.to_string dependency);
-            Util.debug "  Adding them all as `optional` dependencies.\n";
+            Log.debug "  Adding them all as `optional` dependencies.\n";
             (Importance.Optional, List.map fst externals)
         | nixos_deps -> (Importance.Required, nixos_deps)
       in
@@ -262,7 +262,7 @@ let url urlfile : (Url.t, [> unsupported_archive ]) Result.t =
   | `rsync, _, Some _ -> Error (`unsupported_archive "rsync with fragment")
 
 let load_opam path =
-  Util.debug "Loading opam file: %s\n" path;
+  Log.debug "Loading opam file: %s\n" path;
   if not (Sys.file_exists path) then
     raise (Invalid_package ("No opam file at " ^ path));
   let open OpamFilename in
@@ -290,9 +290,6 @@ let nix_of_url ~cache url : (Nix_expr.t, Digest_cache.error) Result.t Lwt.t =
                         lit "pkgs.fetchurl"; attrs [ ("url", str src); digest ];
                       ]))
 
-let drvname_safe =
-  let unsafe_drvname_chars = Str.regexp "[^-_.0-9a-zA-Z]" in
-  fun str -> Str.global_replace unsafe_drvname_chars "-" str
 
 module InputMap = struct
   include Nix_expr.AttrSet
@@ -369,9 +366,9 @@ module Dependencies = struct
                     | Required m ->
                         Hashtbl.remove nix_deps (may_need_pkg m);
                         Hashtbl.replace nix_deps requirement ()
-                    | Optional m ->
-                        if not @@ Hashtbl.mem nix_deps (require_pkg m) then
-                          Hashtbl.replace nix_deps requirement ())
+                    | Optional _ -> ())
+                        (* if not @@ Hashtbl.mem nix_deps (require_pkg m) then
+                         *   Hashtbl.replace nix_deps requirement ()) *)
                   pkg_set)
               externals)
     in
@@ -390,7 +387,7 @@ let add_implicit_build_dependencies ~add_dep commands =
     | None -> None
     | Some pkg ->
         let pkgname = OpamPackage.Name.to_string pkg in
-        Util.debug "  adding implied dep: %s\n" pkgname;
+        Log.debug "  adding implied dep: %s\n" pkgname;
         implicit_optdeps := !implicit_optdeps |> OpamStd.String.Set.add pkgname;
         (* value doesn't actually matter, since we don't use the result *)
         Some (OpamTypes.B true)
@@ -417,12 +414,14 @@ let add_build_dependencies deps (commands : OpamTypes.command list) =
     | None -> None
     | Some pkg ->
         let pkgname = OpamPackage.Name.to_string pkg in
-        Util.debug "  adding implied dep: %s\n" pkgname;
+        Log.debug "  adding implied dep: %s\n" pkgname;
         Dependencies.optional deps (Dependency.SimpleOpam pkgname);
         (* value doesn't actually matter, since we don't use the result *)
         Some (OpamTypes.B true)
   in
   ignore @@ OpamFilter.commands lookup_var commands
+
+let filter_nixos_dependencies depexts = depexts
 
 let add_opam_dependencies deps opam =
   List.iter
@@ -432,9 +431,7 @@ let add_opam_dependencies deps opam =
   Dependencies.requires deps (Dependency.Package (OpamFile.OPAM.depends opam));
   match OpamFile.OPAM.depexts opam with
   | [] -> ()
-  | depexts -> Dependencies.requires deps (Dependency.External depexts)
-
-type opam_src = [ `Dir of Nix_expr.t | `File of Nix_expr.t ]
+  | depexts -> Dependencies.requires deps (Dependency.External (filter_nixos_dependencies depexts))
 
 let opam2nix ?url ?src ~pkg ~opam_src opam =
   let name = OpamPackage.(name pkg |> Name.to_string) in
@@ -447,7 +444,7 @@ let opam2nix ?url ?src ~pkg ~opam_src opam =
         Dependencies.requires dependencies (Dependency.SimpleOpam "unzip")
   | None -> () );
 
-  let property_of_input src pkg_dep : Nix_expr.t =
+  let property_of_input src pkg_dep =
     match pkg_dep with
     | Optional name -> Nix_expr.optional name src
     | Required name -> PropertyPath (src, String.split_on_char '.' name)
@@ -465,29 +462,18 @@ let opam2nix ?url ?src ~pkg ~opam_src opam =
       Nix_expr.AttrSet.empty opam_inputs
   in
 
-  let nix_deps =
+  let build_inputs =
     let pkgs = Nix_expr.Id "pkgs" in
     let name_of = function Required name | Optional name -> name in
     List.sort (fun a b -> String.compare (name_of a) (name_of b)) nix_deps
     |> List.map (property_of_input pkgs)
   in
-
+  
   (* TODO: separate build-only deps from propagated *)
-  Nix_expr.attrs
-    (let base =
-       [
-         ("pname", Nix_expr.str (drvname_safe name));
-         ("version", Nix_expr.str (drvname_safe version));
-         ("src", src |> Option.value ~default:Nix_expr.Null);
-         ("opamInputs", Attrs opam_inputs);
-         ("opamSrc", match opam_src with `Dir expr | `File expr -> expr);
-       ]
-     in
-     match nix_deps with
-     | [] -> base
-     | nix_deps -> ("buildInputs", List nix_deps) :: base)
+  Nix_expr.opam_attrset
+    ~pname:name ~version ?src ~opam_inputs ~opam_src ~build_inputs
 
-let nix_of_opam ?url ?src ~pkg ~(opam_src : opam_src) opam =
+let nix_of_opam ?url ?src ~pkg ~opam_src opam =
   let nix_e = opam2nix ?url ?src ~pkg ~opam_src opam in
   let name = OpamPackage.(name pkg |> Name.to_string) in
   let version = OpamPackage.(version pkg |> Version.to_string) in
@@ -527,21 +513,10 @@ let nix_of_opam ?url ?src ~pkg ~(opam_src : opam_src) opam =
     |> List.map (property_of_input (Id "pkgs"))
   in
 
-  (* TODO: separate build-only deps from propagated *)
-  let nix_e_res =
-    Nix_expr.attrs
-      (let base =
-         [
-           ("pname", Nix_expr.str (drvname_safe name));
-           ("version", Nix_expr.str (drvname_safe version));
-           ("src", src |> Option.value ~default:Nix_expr.Null);
-           ("opamInputs", Attrs opam_inputs);
-           ("opamSrc", match opam_src with `Dir expr | `File expr -> expr);
-         ]
-       in
-       match nix_deps with
-       | [] -> base
-       | nix_deps -> ("buildInputs", List nix_deps) :: base)
+  let nix_e_res = 
+  Nix_expr.opam_attrset
+    ~pname:name ~version ?src ~opam_inputs ~opam_src ~build_inputs:nix_deps
+
   in
   Format.printf "Writing nix attrset files %s@." name;
   Nix_expr.write_file ~filename:"nix_refactor.nix" nix_e;
@@ -549,3 +524,5 @@ let nix_of_opam ?url ?src ~pkg ~(opam_src : opam_src) opam =
   let n = Sys.command "diff nix_refactor.nix nix_orig.nix" in
   if n <> 0 then Format.printf "AHAH: %s@." name;
   nix_e_res
+
+let nixify = nix_of_opam

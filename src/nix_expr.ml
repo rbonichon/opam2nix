@@ -38,7 +38,7 @@ let lit s = Lit s
 
 let rec_attrs l = Rec_attrs (attrset l)
 
-let optional name e  = Property_or (e, name, Null)
+let optional name e = Property_or (e, name, Null)
 
 let apply_replacements (replacements : (Str.regexp * string) list) (s : string)
     : string =
@@ -182,3 +182,25 @@ let write_file ~filename t =
   write oc t;
   flush oc;
   close_out oc
+
+let drv_escape =
+  let unsafe_drvname_chars = Str.regexp "[^-_.0-9a-zA-Z]" in
+  fun str -> Str.global_replace unsafe_drvname_chars "-" str
+
+type opam_src = Dir of t | File of t
+
+let opam_attrset ?src ?(build_inputs = []) ~pname ~version ~opam_inputs
+    ~opam_src =
+  attrs
+    (let base =
+       [
+         ("pname", str (drv_escape pname));
+         ("version", str (drv_escape version));
+         ("src", Option.value ~default:Null src);
+         ("opamInputs", Attrs opam_inputs);
+         ("opamSrc", match opam_src with Dir expr | File expr -> expr);
+       ]
+     in
+     match build_inputs with
+     | [] -> base
+     | deps -> ("build_inputs", List deps) :: base)

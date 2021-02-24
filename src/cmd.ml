@@ -13,7 +13,7 @@ module Internal_ = struct
     | _ -> Error (`command_failed (None, cmd))
 
   let print_desc ~print cmd =
-    if print || Util.verbose () then prerr_endline (" + " ^ desc cmd)
+    if print || Log.verbose () then prerr_endline (" + " ^ desc cmd)
 end
 
 let string_of_command_failed (`command_failed (_, cmd)) =

@@ -2,7 +2,6 @@ module JSON = Yojson.Basic
 module OPAM = OpamFile.OPAM
 module Version = OpamPackage.Version
 module Name = OpamPackage.Name
-open Util
 
 let getenv k =
   try Unix.getenv k
@@ -61,7 +60,7 @@ let load_env () =
   let packages = ref Name.Map.empty in
 
   let add_package name impl =
-    debug " - package %s: %s\n" name
+    Log.debug " - package %s: %s\n" name
       ( match impl with
       | Absent -> "absent"
       | Provided -> "provided"
@@ -75,14 +74,14 @@ let load_env () =
   let json = JSON.from_string (getenv "opamEnv") in
   (* TODO when we can use structuredAttrs *)
   (* let json = JSON.from_file ".attrs.json" |> JSON.Util.member "opamEnv" in *)
-  debug "Using opamEnv: %s\n" (JSON.to_string json);
+  Log.debug "Using opamEnv: %s\n" (JSON.to_string json);
   let () =
     match json with
     | `Assoc pairs ->
         pairs
         |> List.iter (function
              | "deps", `Assoc attrs ->
-                 debug "adding packages from opamEnv\n";
+                 Log.debug "adding packages from opamEnv\n";
                  attrs
                  |> List.iter (fun (pkgname, value) ->
                         match value with

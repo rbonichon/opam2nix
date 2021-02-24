@@ -70,7 +70,7 @@ let package_var ~env =
   let b v = Some (B v) in
   let installed = function Absent -> false | Provided | Installed _ -> true in
   let rec lookup ~pkg key =
-    debug "(variable `%s` of package `%s`)\n" key (Name.to_string pkg);
+    Log.debug "(variable `%s` of package `%s`)\n" key (Name.to_string pkg);
     let impl =
       Name.Map.find_opt pkg env.packages |> Option.value ~default:Absent
     in
@@ -131,7 +131,7 @@ let lookup env key =
   let open OpamVariable in
   let keystr = Full.to_string key in
   let package_var = package_var ~env in
-  debug "Looking up opam var %s ..\n" keystr;
+  Log.debug "Looking up opam var %s ..\n" keystr;
   let result =
     simple_lookup ~vars:env.vars key
     |> Option.or_else_fn (fun () ->
@@ -162,8 +162,8 @@ let lookup env key =
                    |> Option.or_else_fn (fun () ->
                           package_var ~pkg:env.self unqualified) ))
   in
-  debug " -> %s\n"
+  Log.debug " -> %s\n"
     (Option.to_string OpamVariable.string_of_variable_contents result);
   if Option.is_none result then
-    Printf.eprintf "WARN: opam var %s not found...\n" keystr;
+    Log.warn "Opam var %s not found...@." keystr;
   result

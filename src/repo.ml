@@ -1,4 +1,3 @@
-open Util
 open OpamFile
 module Version = OpamPackage.Version
 module Name = OpamPackage.Name
@@ -32,7 +31,7 @@ type package = {
 (* Loaded package, either from an opam repo or direct package supplied on the commandline *)
 type loaded_package = {
   loaded_opam : OPAM.t;
-  repository_expr : unit -> Opam_metadata.opam_src Lwt.t;
+  repository_expr : unit -> Nix_expr.opam_src Lwt.t;
   src_expr :
     Digest_cache.t -> (Nix_expr.t option, Digest_cache.error) Result.t Lwt.t;
   loaded_url : Opam_metadata.Url.t option;
@@ -71,18 +70,18 @@ let list_package =
     package ^ version_sep ^ Version.to_string version
   in
   fun repo package ->
-    debug "processing package %s\n" package;
+    Log.debug "processing package %s\n" package;
     let package_base = Filename.concat packages_dir package in
     let package_abs = Filename.concat repo.repo_path package_base in
     let list_versions () =
-      debug "listing %s\n" package_abs;
+      Log.debug "listing %s\n" package_abs;
       let dirs =
         try Util.list_dirs package_abs
         with Sys_error e ->
-          debug "Skipping (%s)\n" e;
+          Log.debug "Skipping (%s)\n" e;
           []
       in
-      filter_map (without_leading (package ^ version_sep)) dirs
+      Util.filter_map (Util.without_leading (package ^ version_sep)) dirs
       |> List.map Version.of_string
       |> List.filter (fun version ->
              Sys.file_exists

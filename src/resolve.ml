@@ -123,7 +123,7 @@ let setup_external_constraints ~repos_base ~repos ~detect_from ~ocaml_version
     s |> Str.global_replace (Str.regexp "\"") "" |> String.trim
   in
   let detect_nixpkgs_ocaml_version () =
-    Util.debug "detecting current <nixpkgs> ocaml version\n";
+    Log.debug "detecting current <nixpkgs> ocaml version\n";
     Cmd.run_output_opt ~print:false
       [ "nix-instantiate"; "--eval"; "--attr"; "ocaml.version"; "<nixpkgs>" ]
     |> Lwt.map (Option.map remove_quotes)
@@ -131,7 +131,7 @@ let setup_external_constraints ~repos_base ~repos ~detect_from ~ocaml_version
 
   let detect_ocaml_version () =
     if Sys.file_exists detect_from then (
-      Util.debug "detecting ocaml version from %s\n" detect_from;
+      Log.debug "detecting ocaml version from %s\n" detect_from;
       let fullpath =
         if Filename.is_relative detect_from then
           Filename.concat (Unix.getcwd ()) detect_from
@@ -229,12 +229,12 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
                   in
                   let url = loaded_url in
                   ( OpamPackage.name pkg |> Name.to_string,
-                    nix_of_opam ~pkg ?url ?src ~opam_src:repository_expr
+                    nixify ~pkg ?url ?src ~opam_src:repository_expr
                       loaded_opam )))
     |> Lwt_main.run
   in
 
-  debug "Add downloaded packages (%d) " (List.length new_packages);
+  Log.debug "Add downloaded packages (%d) " (List.length new_packages);
   (* add downloaded packages *)
   let selection = AttrSet.of_list new_packages in
 
@@ -362,8 +362,8 @@ let main idx args =
         ( "--define",
           Arg.String (fun x -> direct_definitions := x :: !direct_definitions),
           "PACKAGE Define an .opam package without necessarily installing it" );
-        ("--verbose", Arg.Set Util._verbose, " Verbose");
-        ("-v", Arg.Set Util._verbose, " Verbose");
+        ("--verbose", Arg.Unit (fun () -> Log.set_verbose true), " Verbose");
+        ("-v", Arg.Unit (fun () -> Log.set_verbose true), " Verbose");
       ]
   in
   let packages = ref [] in
@@ -371,7 +371,7 @@ let main idx args =
   Arg.parse_argv ~current:(ref idx) args opts add_package
     "usage: opam2nix [OPTIONS] package [package...]";
 
-  let () = if Util.verbose () then OpamCoreConfig.update ~debug_level:2 () in
+  if Log.verbose () then OpamCoreConfig.update ~debug_level:2 ();
 
   if !packages = [] then failwith "At least one package required";
   let direct_requests, repo_packages =
@@ -381,8 +381,8 @@ let main idx args =
         &&
         let file_exists = Sys.file_exists pkg in
         if not file_exists then
-          Printf.eprintf
-            "WARN: %s looks like a path but does not exist on disk\n" pkg;
+          Log.warn
+            "%s looks like a path but does not exist on disk@." pkg;
         file_exists)
       !packages
   in
@@ -417,7 +417,7 @@ let main idx args =
     repo_packages
     |> List.map (fun spec ->
            let relop_re = Str.regexp "[!<=>]+" in
-           Util.debug "Parsing spec %s\n" spec;
+           Log.debug "Parsing spec %s\n" spec;
            match Str.full_split relop_re spec with
            | [ Str.Text name; Str.Delim relop; Str.Text ver ] ->
                (* As of 20200906, we only support explicit versioning in cmdline specs *)
@@ -440,7 +440,7 @@ let main idx args =
 
   let cache =
     FileUtil.mkdir ~parent:true (Filename.dirname digest_map);
-    Util.debug "Using digest mapping at %s\n" digest_map;
+    Log.debug "Using digest mapping at %s\n" digest_map;
     try Digest_cache.try_load digest_map
     with e ->
       Printf.eprintf

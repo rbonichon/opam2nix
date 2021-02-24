@@ -39,19 +39,6 @@ let rec rm_r root =
     Unix.rmdir root )
 
 
-let _verbose = ref false
-
-let verbose () = !_verbose
-
-let set_verbose v =
-  if v then Printf.eprintf "Verbose output enabled\n";
-  _verbose := v
-
-let debug fmt =
-  (if verbose () then Printf.eprintf else Printf.ifprintf stderr) fmt
 
 let getenv_opt name = try Some (Unix.getenv name) with Not_found -> None
 
-let () =
-  let envvar = getenv_opt "OPAM2NIX_VERBOSE" |> Option.value ~default:"" in
-  set_verbose (envvar = "1" || envvar = "true")

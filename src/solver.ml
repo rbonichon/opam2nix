@@ -37,7 +37,7 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
                   ( name,
                     Installed
                       { path = None; (* not yet known *)
-                                     version = Some version } );
+                        version = Some version } );
                   ( Name.of_string "ocaml",
                     Installed
                       {
@@ -80,7 +80,7 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
                  repository_expr =
                    (fun () ->
                      Lwt.return
-                       (`File (Nix_expr.str package.direct_opam_relative)));
+                       Nix_expr.(File (str package.direct_opam_relative)));
                } ))
     |> OpamPackage.Map.of_list
   in
@@ -104,16 +104,16 @@ let load_package ~url pkg : loaded_package =
     Repo.nix_digest_of_path (Repo.full_path pkg)
     |> Lwt.map (fun (`sha256 digest) ->
            let digest = "sha256:" ^ digest in
-           `Dir
-             Nix_expr.(
-               Call
-                 [
-                   Id "repoPath";
-                   PropertyPath (Id "repos", [ repo_key pkg.repo; "src" ]);
-                   Attrs
-                     (AttrSet.of_list
-                        [ ("package", str pkg.rel_path); ("hash", str digest) ]);
-                 ]))
+           Nix_expr.(
+             Dir
+               (Call
+                  [
+                    Id "repoPath";
+                    PropertyPath (Id "repos", [ repo_key pkg.repo; "src" ]);
+                    Attrs
+                      (AttrSet.of_list
+                         [ ("package", str pkg.rel_path); ("hash", str digest) ]);
+                  ])))
   in
   { loaded_opam = pkg.opam; loaded_url = url; src_expr; repository_expr }
 
