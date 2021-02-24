@@ -2,7 +2,7 @@ open Lwt.Infix
 
 type command_failed = [ `command_failed of int option * string list ]
 
-module Internal_ = struct
+module Internal = struct
   let desc cmd = String.concat " " cmd
 
   let result_of_status ~cmd =
@@ -17,18 +17,7 @@ module Internal_ = struct
 end
 
 let string_of_command_failed (`command_failed (_, cmd)) =
-  Internal_.desc cmd ^ " failed"
-
-module Internal = struct
-  include Internal_
-
-  let assert_success result =
-    match result with
-    | Ok x -> x
-    | Error e -> failwith (string_of_command_failed e)
-end
-
-open Internal
+  Internal.desc cmd ^ " failed"
 
 let join_result :
       'a 'e. 'a -> (unit, command_failed) Result.t ->
@@ -64,14 +53,10 @@ let run (spawn : Lwt_process.command -> 'proc) ?(print = true)
   Lwt.try_bind
     (fun () -> block proc)
     (fun result ->
-      proc#close |> Lwt.map (result_of_status ~cmd) |> Lwt.map (join result))
+      proc#close |> Lwt.map (Internal.result_of_status ~cmd) |> Lwt.map (join result))
     (fun err -> proc#close >>= fun _ -> Lwt.fail err)
 
 let exec_r ?stdin ?stderr = Lwt_process.open_process_in ?stdin ?stderr
-
-let exec_w ?stdout ?stderr = Lwt_process.open_process_out ?stdout ?stderr
-
-let exec_rw ?stderr = Lwt_process.open_process ?stderr
 
 let exec_none ?stdin ?stdout ?stderr =
   Lwt_process.open_process_none ?stdin ?stdout ?stderr
