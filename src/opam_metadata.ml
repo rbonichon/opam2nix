@@ -8,7 +8,7 @@ module Url = struct
   let ends_with ext (Url (u, _)) = Util.ends_with ext u
 end
 
-type unsupported_archive = [ `unsupported_archive of string ]
+type unsupported_archive = Unsupported_archive of string
 
 exception Invalid_package of string
 
@@ -51,15 +51,10 @@ module Dependency = struct
           | Filter f -> OpamFilter.to_string f
           | Constraint (op, f) -> string_of_relop op ^ OpamFilter.to_string f
         in
-        let string_of_atom :
-            OpamPackage.Name.t
-            * OpamTypes.filter OpamTypes.filter_or_constraint
-              OpamFormula.formula ->
-            string =
-         fun (name, formula) ->
-          OpamPackage.Name.to_string name
-          ^ ":"
-          ^ OpamFormula.string_of_formula string_of_filter formula
+        let string_of_atom (name, formula) =
+          Printf.sprintf "%s:%s"
+            (OpamPackage.Name.to_string name)
+            (OpamFormula.string_of_formula string_of_filter formula)
         in
         fprintf ppf "package_formula:%s"
           (OpamFormula.string_of_formula string_of_atom formula)
@@ -80,28 +75,6 @@ module Importance = struct
 end
 
 type 'a requirement = Required of 'a | Optional of 'a
-
-module Requirement = struct
-  type t = Dependency.t requirement
-
-  let _pp ppf = function
-    | Required dep -> Dependency.pp ppf dep
-    | Optional dep -> fprintf ppf "{%a}" Dependency.pp dep
-
-  let _optional d = Optional d
-
-  let _required d = Required d
-
-  let _dependency = function _, d -> d
-
-  (* let compare d1 d2 =
-   *   match d1, d2 with
-   *   | Required _ , Required _ | Optional _, Optional _ -> 0
-   *   | Required _ , Optional _ -> 1
-   *   | Optional _, Required _ -> -1
-   * 
-   * let ( > ) d1 d2 = compare d1 d2 > 0 *)
-end
 
 let add_var (scope : OpamVariable.t -> OpamVariable.Full.t) name v vars =
   let var : OpamVariable.Full.t = scope (OpamVariable.of_string name) in
@@ -157,14 +130,6 @@ let add_base_variables base_vars =
 
 let init_variables () = add_base_variables (nixos_vars ())
 
-(* let installed_pkg_var key =
- *   let open OpamVariable in
- *   match Full.scope key with
- *   | Full.Package pkg
- *     when Full.variable key |> OpamVariable.to_string = "installed" ->
- *       Some pkg
- *   | _ -> None *)
-
 let add_nix_inputs ~add_native ~(add_opam : Importance.t -> string -> unit)
     (importance, dependency) =
   let nixos_env = Vars.simple_lookup ~vars:(nixos_vars ()) in
@@ -197,7 +162,7 @@ let add_nix_inputs ~add_native ~(add_opam : Importance.t -> string -> unit)
         match Util.filter_map (apply_filters nixos_env) externals with
         | [] ->
             Log.debug
-              "  Note: package has depexts, but none of them `nixos`:\n    %s\n"
+              "Note: package has depexts, but none of them `nixos`:\n    %s\n"
               (Dependency.to_string dependency);
             Log.debug "  Adding them all as `optional` dependencies.\n";
             (Importance.Optional, List.map fst externals)
@@ -236,33 +201,29 @@ let add_nix_inputs ~add_native ~(add_opam : Importance.t -> string -> unit)
       (* why ? *)
       add_formula Optional formula
 
-let url urlfile : (Url.t, [> unsupported_archive ]) Result.t =
+let url urlfile =
   let url, checksums =
     (OpamFile.URL.url urlfile, OpamFile.URL.checksum urlfile)
   in
   let OpamUrl.{ hash; transport; backend; _ } = url in
   let url_without_backend = OpamUrl.base_url url in
-  let checksums =
-    if checksums = [] then Error (`unsupported_archive "Checksum required")
-    else Ok checksums
-  in
+  let err s = Error (Unsupported_archive s) in
+
   match (backend, transport, hash) with
-  | `git, _, _ -> Error (`unsupported_archive "git")
-  | `darcs, _, _ -> Error (`unsupported_archive "darcs")
-  | `hg, _, _ -> Error (`unsupported_archive "hg")
-  | `http, "file", None | `rsync, "file", None ->
-      Error (`unsupported_archive "local path")
+  | `git, _, _ -> err "git"
+  | `darcs, _, _ -> err "darcs"
+  | `hg, _, _ -> err "hg"
+  | `http, "file", None | `rsync, "file", None -> err "local path"
   | `http, _, None ->
-      checksums
+      (if checksums = [] then err "Checksum required" else Ok checksums)
       |> Result.map (fun checksums -> Url.create url_without_backend checksums)
       (* drop the VCS portion *)
-  | `http, _, Some _ -> Error (`unsupported_archive "http with fragment")
-  | `rsync, transport, None ->
-      Error (`unsupported_archive ("rsync transport: " ^ transport))
-  | `rsync, _, Some _ -> Error (`unsupported_archive "rsync with fragment")
+  | `http, _, Some _ -> err "http with fragment"
+  | `rsync, transport, None -> err ("rsync transport: " ^ transport)
+  | `rsync, _, Some _ -> err "rsync with fragment"
 
 let load_opam path =
-  Log.debug "Loading opam file: %s\n" path;
+  Log.debug "Loading opam file: %s@." path;
   if not (Sys.file_exists path) then
     raise (Invalid_package ("No opam file at " ^ path));
   let open OpamFilename in
@@ -283,7 +244,8 @@ let nix_of_url ~cache url : (Nix_expr.t, Digest_cache.error) Result.t Lwt.t =
       Digest_cache.add src checksums cache
       |> Lwt.map (fun digest ->
              digest
-             |> Result.map (function Digest_cache.Sha256 sha256 -> ("sha256", str sha256))
+             |> Result.map (function Digest_cache.Sha256 sha256 ->
+                    ("sha256", str sha256))
              |> Result.map (fun digest ->
                     call
                       [

@@ -3,21 +3,24 @@ module Cache = OpamStd.String.Map
 
 type key = string
 
-type nix_digest = Sha256 of string 
+type nix_digest = Sha256 of string
 
 type checksum_mismatch = [ `checksum_mismatch of string ]
 
 type unknown_error = [ `error of string ]
 
 type error =
-  [ checksum_mismatch | Cmd.command_failed | Download.error | unknown_error ]
+  [ checksum_mismatch
+  | Cmd.command_failed
+  | `download_failed of key
+  | unknown_error ]
 
 let string_of_checksum_mismatch (`checksum_mismatch e) =
   "Checksum mismatch: " ^ e
 
 let string_of_error : error -> string = function
   | `checksum_mismatch _ as e -> string_of_checksum_mismatch e
-  | `download_failed _ as e -> Download.string_of_error e
+  | `download_failed s -> Download.(string_of_error (Download_failed s))
   | `command_failed _ as e -> Cmd.string_of_command_failed e
   | `error s -> s
 
@@ -78,8 +81,7 @@ let key_of_opam_digest digest =
 
 let json_of_cache (cache : nix_digest Cache.t) : JSON.t =
   let sorted_bindings : (string * nix_digest) list =
-    Cache.bindings cache
-    |> List.sort (fun (a, _) (b, _) -> String.compare b a)
+    Cache.bindings cache |> List.sort (fun (a, _) (b, _) -> String.compare b a)
   in
 
   let properties =
@@ -200,7 +202,14 @@ let add url opam_digests cache : (nix_digest, error) Result.t Lwt.t =
   add_custom cache ~keys (fun () ->
       let dest, dest_channel = Filename.open_temp_file "opam2nix" "archive" in
       let ctx = ensure_ctx cache in
-      Download.fetch ctx ~dest:dest_channel url
-      |> Lwt.map (Result.bind (fun () -> check_digests opam_digests dest))
-      >>= (fun () -> sha256_of_path dest)
-      |> Lwt_result.map (fun digest -> Sha256 digest))
+      let d = Download.fetch ctx ~dest:dest_channel url in
+      Lwt.bind d (function
+        | Error (Download.Download_failed s) ->
+            Lwt.return_error (`download_failed s)
+        | Ok () -> (
+            match check_digests opam_digests dest with
+            | Error e -> Lwt.return_error e
+            | Ok () ->
+                Lwt_result.map
+                  (fun digest -> Sha256 digest)
+                  (sha256_of_path dest) )))

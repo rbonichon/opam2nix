@@ -1,6 +1,6 @@
-type error = [ `download_failed of string ]
+type error = Download_failed of string
 
-let string_of_error (`download_failed desc) = "Download failed: " ^ desc
+let string_of_error (Download_failed desc) = "Download failed: " ^ desc
 
 let max_concurrency = 10
 
@@ -30,7 +30,7 @@ end = struct
   let use = Lwt_pool.use
 end
 
-let fetch (ctx : Ctx.t) ~dest url : (unit, [> error ]) Result.t Lwt.t =
+let fetch (ctx : Ctx.t) ~dest url : (unit, error) Result.t Lwt.t =
   Ctx.use ctx (fun () ->
       Printf.eprintf " [ downloading %s ]\n" url;
       flush stderr;
@@ -54,4 +54,4 @@ let fetch (ctx : Ctx.t) ~dest url : (unit, [> error ]) Result.t Lwt.t =
            | Curl.CURLE_OK -> Ok ()
            | err ->
                Printf.eprintf "Curl error: %s\n" (Curl.strerror err);
-               Error (`download_failed url)))
+               Error (Download_failed url)))

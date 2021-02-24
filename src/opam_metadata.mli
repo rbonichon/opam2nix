@@ -7,7 +7,7 @@ module Url : sig
   val create : string -> OpamHash.t list -> t
 end
 
-type unsupported_archive = [ `unsupported_archive of OpamTypes.file_name ]
+type unsupported_archive = Unsupported_archive of OpamTypes.file_name
 
 val load_opam : string -> OpamFile.OPAM.t
 (** [load_opam tag] *)
@@ -20,13 +20,8 @@ val nix_of_url :
   cache:Digest_cache.t -> Url.t -> (Nix_expr.t, Digest_cache.error) result Lwt.t
 (** [nix_of_url] *)
 
-val url : OpamFile.URL.t -> (Url.t, [> unsupported_archive ]) result
+val url : OpamFile.URL.t -> (Url.t, unsupported_archive) result
 (** [url] *)
-
-(** [Requirement] *)
-module Requirement : sig
-  type t
-end
 
 val nixify :
   ?url:Url.t ->

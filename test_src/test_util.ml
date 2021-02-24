@@ -17,20 +17,18 @@ let to_char x y =
 end
 
 
-let explode s =
-	let rec exp i l =
-		if i < 0 then l else exp (i - 1) (s.[i] :: l) in
-		exp (String.length s - 1) []
-
 let encode_nix_safe_path str =
 	let encode ch =
 	  let a,b = (Hex.of_char ch) in
           Printf.sprintf "+x%c%c" a b 
 	in
 	let open Str in
-	full_split (regexp "[^.+_a-zA-Z0-9-]\\|\\+x") str |> List.map (function
-		| Delim x when x = "+x" -> (encode '+' ^ encode 'x')
-		| Delim x -> String.concat "" (List.map encode (explode x))
+	full_split (regexp "[^.+_a-zA-Z0-9-]\\|\\+x") str
+        |> List.map (function
+	       | Delim x ->
+                  let b = Buffer.create (String.length x) in
+                  String.iter (fun c -> Buffer.add_string b (encode c)) x;
+                  Buffer.contents b
 		| Text x -> x
 	) |> String.concat ""
 
@@ -62,10 +60,11 @@ let group_by f l =
                              | None -> Hashtbl.add h k [e]) l;
   Hashtbl.fold (fun k v l -> (k, v) :: l) h []
 
-let suite = "Util" >:::
-[
-	"filename encoding" >::: [
-		test_encode "hello there" "hello+x20there";
+let suite =
+  "Util" >:::
+    [
+      "filename encoding" >::: [
+	test_encode "hello there" "hello+x20there";
 		test_encode "hello	there" "hello+x09there";
 		test_encode "++x+x" "++x2b+x78+x2b+x78";
 		test_encode "xxx" "xxx";

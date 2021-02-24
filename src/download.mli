@@ -1,6 +1,6 @@
-type error = [ `download_failed of string ]
+type error = Download_failed of string
 
-val string_of_error : [< `download_failed of string ] -> string
+val string_of_error : error -> string
 (** [string_of_error] *)
 
 (** [Ctx] *)
@@ -14,6 +14,5 @@ module Ctx : sig
   val use : t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
-val fetch :
-  Ctx.t -> dest:out_channel -> string -> (unit, [> error ]) result Lwt.t
+val fetch : Ctx.t -> dest:out_channel -> string -> (unit, error) result Lwt.t
 (** [fetch] *)

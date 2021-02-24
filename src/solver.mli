@@ -3,7 +3,7 @@ type external_constraints = {
   repos : Repo.t list;
 }
 
-type error = [ `unavailable of string | `unsupported_archive of string ]
+type error = Unsupported_archive of string | Unavailable of string
 
 type universe = {
   lookup_var :
