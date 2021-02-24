@@ -79,8 +79,7 @@ let key_of_opam_digest digest =
 let json_of_cache (cache : nix_digest Cache.t) : JSON.t =
   let sorted_bindings : (string * nix_digest) list =
     Cache.bindings cache
-    |> List.sort (fun (a, _) (b, _) -> String.compare a b)
-    |> List.rev
+    |> List.sort (fun (a, _) (b, _) -> String.compare b a)
   in
 
   let properties =
