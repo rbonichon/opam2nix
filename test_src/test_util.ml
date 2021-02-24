@@ -1,6 +1,46 @@
 open OUnit2
-open Opam2nix
-open Util
+
+module Hex = struct
+  let hexa = "0123456789abcdef"
+let of_char c =
+  let x = Char.code c in
+  hexa.[x lsr 4], hexa.[x land 0xf]
+
+let to_char x y =
+  let code c = match c with
+    | '0'..'9' -> Char.code c - 48 (* Char.code '0' *)
+    | 'A'..'F' -> Char.code c - 55 (* Char.code 'A' + 10 *)
+    | 'a'..'f' -> Char.code c - 87 (* Char.code 'a' + 10 *)
+    | _ -> let msg = Printf.sprintf "Hex.to_char: %d is an invalid char" (Char.code c) in failwith msg 
+  in
+  Char.chr (code x lsl 4 + code y)
+end
+
+
+let explode s =
+	let rec exp i l =
+		if i < 0 then l else exp (i - 1) (s.[i] :: l) in
+		exp (String.length s - 1) []
+
+let encode_nix_safe_path str =
+	let encode ch =
+	  let a,b = (Hex.of_char ch) in
+          Printf.sprintf "+x%c%c" a b 
+	in
+	let open Str in
+	full_split (regexp "[^.+_a-zA-Z0-9-]\\|\\+x") str |> List.map (function
+		| Delim x when x = "+x" -> (encode '+' ^ encode 'x')
+		| Delim x -> String.concat "" (List.map encode (explode x))
+		| Text x -> x
+	) |> String.concat ""
+
+let decode_nix_safe_path str =
+	let open Str in
+	let hex = "[0-9a-fA-F]" in
+	full_split (regexp ("\\+x" ^ hex ^ hex)) str |> List.map (function
+		| Delim x -> Hex.to_char x.[2] x.[3] |> String.make 1
+		| Text x -> x
+	) |> String.concat ""
 
 let print_string x = x
 
@@ -13,6 +53,14 @@ let test_decode str expected =
 	"decode" >:: (fun _ ->
 		assert_equal ~printer:print_string expected (decode_nix_safe_path str)
 	)
+
+let group_by f l =
+  let h = Hashtbl.create 7 in
+  List.iter
+    (fun e -> let k = f e in match Hashtbl.find_opt h k with
+                             | Some l -> Hashtbl.add h k (e :: l)
+                             | None -> Hashtbl.add h k [e]) l;
+  Hashtbl.fold (fun k v l -> (k, v) :: l) h []
 
 let suite = "Util" >:::
 [
