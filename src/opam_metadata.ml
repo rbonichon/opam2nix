@@ -410,13 +410,14 @@ let opam2nix ?url ?src ~pkg ~opam_src opam =
   let property_of_input src pkg_dep =
     match pkg_dep with
     | Optional name -> Nix_expr.optional name src
-    | Required name -> PropertyPath (src, String.split_on_char '.' name)
+    | Required name ->
+        Nix_expr.property_path src (String.split_on_char '.' name)
   in
 
   let opam_inputs, nix_deps = Dependencies.partition dependencies in
 
   let opam_inputs =
-    let selection = Nix_expr.Id "selection" in
+    let selection = Nix_expr.id "selection" in
     List.fold_left
       (fun map -> function
         | (Required name | Optional name) as dep ->
@@ -426,7 +427,7 @@ let opam2nix ?url ?src ~pkg ~opam_src opam =
   in
 
   let build_inputs =
-    let pkgs = Nix_expr.Id "pkgs" in
+    let pkgs = Nix_expr.id "pkgs" in
     let name_of = function Required name | Optional name -> name in
     List.sort (fun a b -> String.compare (name_of a) (name_of b)) nix_deps
     |> List.map (property_of_input pkgs)
@@ -455,10 +456,11 @@ let nix_of_opam ?url ?src ~pkg ~opam_src opam =
   ( match url with
   | Some u -> if Url.ends_with ".zip" u then add_native Required "unzip"
   | None -> () );
-  let property_of_input src (name, importance) : Nix_expr.t =
+  let property_of_input src (name, importance) =
+    let open Nix_expr in
     match importance with
-    | Importance.Optional -> Property_or (src, name, Null)
-    | Importance.Required -> PropertyPath (src, String.split_on_char '.' name)
+    | Importance.Optional -> property_or src name null
+    | Importance.Required -> property_path src (String.split_on_char '.' name)
   in
   let sorted_bindings_of_input input =
     input |> InputMap.bindings
@@ -468,12 +470,12 @@ let nix_of_opam ?url ?src ~pkg ~opam_src opam =
   let opam_inputs =
     !opam_inputs
     |> InputMap.mapi (fun name importance ->
-           property_of_input (Id "selection") (name, importance))
+           property_of_input (Nix_expr.id "selection") (name, importance))
   in
 
   let nix_deps =
     !nix_deps |> sorted_bindings_of_input
-    |> List.map (property_of_input (Id "pkgs"))
+    |> List.map (property_of_input (Nix_expr.id "pkgs"))
   in
 
   let nix_e_res =

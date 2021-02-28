@@ -37,25 +37,21 @@ type value_partial = { val_type : string option; val_digest : string option }
 
 let empty_partial = { val_type = None; val_digest = None }
 
+let update_partial partial item =
+  match item with
+  | "type", `String t -> { partial with val_type = Some t }
+  | "digest", `String t -> { partial with val_digest = Some t }
+  | other, _ ->
+      Printf.eprintf "warn: skipping unknown key: %s\n" other;
+      partial
+
 let value_of_json : JSON.t -> nix_digest option = function
   | `Assoc properties -> (
-      let { val_type; val_digest } =
-        properties
-        |> List.fold_left
-             (fun partial item ->
-               match item with
-               | "type", `String t -> { partial with val_type = Some t }
-               | "digest", `String t -> { partial with val_digest = Some t }
-               | other, _ ->
-                   Printf.eprintf "warn: skipping unknown key: %s\n" other;
-                   partial)
-             empty_partial
-      in
-      match (val_type, val_digest) with
-      | Some "sha256", Some digest | None, Some digest ->
+      match List.fold_left update_partial empty_partial properties with
+      | { val_type = Some "sha256" | None; val_digest = Some digest } ->
           (* assume sha256 *)
           Some (Sha256 digest)
-      | _other ->
+      | { val_type = Some _; _ } | { val_digest = None; _ } ->
           Printf.eprintf "Unknown digest value; ignoring: %s\n"
             (JSON.to_string (`Assoc properties));
           None )
@@ -66,16 +62,10 @@ let value_of_json : JSON.t -> nix_digest option = function
 let json_of_nix_digest (Sha256 digest) = `Assoc [ ("digest", `String digest) ]
 
 let key_of_opam_digest digest =
-  (digest |> OpamHash.kind |> OpamHash.string_of_kind |> String.lowercase_ascii)
-  ^ ":"
-  ^ (digest |> OpamHash.contents)
-
-(* let opam_digest_of_key key =
- *   match String.split_on_char ':' key with
- *   | [ "md5"; digest ] -> OpamHash.md5 digest
- *   | [ "sha256"; digest ] -> OpamHash.md5 digest
- *   | [ "sha512"; digest ] -> OpamHash.md5 digest
- *   | _ -> failwith ("Can't parse opam digest: " ^ key) *)
+  let digest_type =
+    digest |> OpamHash.kind |> OpamHash.string_of_kind |> String.lowercase_ascii
+  in
+  Printf.sprintf "%s:%s" digest_type (OpamHash.contents digest)
 
 let json_of_cache (cache : nix_digest Cache.t) : JSON.t =
   let sorted_bindings : (string * nix_digest) list =
@@ -142,8 +132,7 @@ let sha256_of_path p =
   Lwt_result.bind_result output (fun output ->
       match String.split_on_char '\n' output with
       | [ line ] -> Ok line
-      | lines ->
-          Error (`error ("nix-hash returned:\n" ^ String.concat "\n" lines)))
+      | [] | _ :: _ -> Error (`error ("nix-hash returned:\n" ^ output)))
 
 let check_digests (opam_digest : opam_digest list) path :
     (unit, [> checksum_mismatch ]) Result.t =
@@ -167,7 +156,7 @@ let add_custom (cache : t) ~(keys : string list)
   let digests = cache.digests in
   let rec find_first = function
     | [] ->
-        Log.debug "digest_cache no key found in: %s\n" (String.concat "|" keys);
+        Log.debug "digest_cache: no key found in: %s@." (String.concat "|" keys);
         None
     | key :: keys ->
         (try Some (Cache.find key digests) with Not_found -> find_first keys)
@@ -175,7 +164,7 @@ let add_custom (cache : t) ~(keys : string list)
   in
   let update_cache value =
     let add map key =
-      Log.debug "digest_cache: adding key %s\n" key;
+      Log.debug "digest_cache: adding key %s@." key;
       Cache.add key value map
     in
     cache.digests <- List.fold_left add cache.digests keys
@@ -198,16 +187,15 @@ let ensure_ctx cache =
 let add url opam_digests cache : (nix_digest, error) Result.t Lwt.t =
   let keys = List.map key_of_opam_digest opam_digests in
   add_custom cache ~keys (fun () ->
+      let open Lwt.Infix in
       let dest, dest_channel = Filename.open_temp_file "opam2nix" "archive" in
       let ctx = ensure_ctx cache in
-      let d = Download.fetch ctx ~dest:dest_channel url in
-      Lwt.bind d (function
-        | Error (Download.Download_failed s) ->
-            Lwt.return_error (`download_failed s)
-        | Ok () -> (
-            match check_digests opam_digests dest with
-            | Error e -> Lwt.return_error e
-            | Ok () ->
-                Lwt_result.map
-                  (fun digest -> Sha256 digest)
-                  (sha256_of_path dest) )))
+      Download.fetch ctx ~dest:dest_channel url >>= function
+      | Error (Download.Download_failed s) ->
+          Lwt.return_error (`download_failed s)
+      | Ok () -> (
+          match check_digests opam_digests dest with
+          | Error e -> Lwt.return_error e
+          | Ok () ->
+              Lwt_result.map (fun digest -> Sha256 digest) (sha256_of_path dest)
+          ))

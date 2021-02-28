@@ -31,7 +31,7 @@ type package = {
 (* Loaded package, either from an opam repo or direct package supplied on the commandline *)
 type loaded_package = {
   loaded_opam : OPAM.t;
-  repository_expr : unit -> Nix_expr.opam_src Lwt.t;
+  repository_expr : unit -> Nix_expr.Opam_src.t Lwt.t;
   src_expr :
     Digest_cache.t -> (Nix_expr.t option, Digest_cache.error) Result.t Lwt.t;
   loaded_url : Opam_metadata.Url.t option;

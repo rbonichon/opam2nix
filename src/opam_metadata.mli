@@ -27,7 +27,7 @@ val nixify :
   ?url:Url.t ->
   ?src:Nix_expr.t ->
   pkg:OpamPackage.t ->
-  opam_src:Nix_expr.opam_src ->
+  opam_src:Nix_expr.Opam_src.t ->
   OpamFile.OPAM.t ->
   Nix_expr.t
 (** [nix_of_opam] *)

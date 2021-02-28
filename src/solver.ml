@@ -60,8 +60,9 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
         let open Repo in
         let name = package.direct_name in
         let version =
-          package.direct_version
-          |> Option.value ~default:(OpamPackage.Version.of_string "development")
+          Option.value
+            ~default:(OpamPackage.Version.of_string "development")
+            package.direct_version
         in
         let key = OpamPackage.create name version in
         let value =
@@ -71,17 +72,18 @@ let build_universe ~external_constraints ~base_packages ~constrained_versions
               loaded_url = None;
               src_expr =
                 (fun _ ->
-                  Lwt.return
-                    (Ok
-                       (Some
-                          (Nix_expr.Call
-                             [
-                               Lit "self.directSrc";
-                               Nix_expr.str (OpamPackage.Name.to_string name);
-                             ]))));
+                  Lwt.return_ok
+                    (Some
+                       Nix_expr.(
+                         call
+                           [
+                             lit "self.directSrc";
+                             str (OpamPackage.Name.to_string name);
+                           ])));
               repository_expr =
                 (fun () ->
-                  Lwt.return Nix_expr.(File (str package.direct_opam_relative)));
+                  Lwt.return
+                    Nix_expr.(Opam_src.file (str package.direct_opam_relative)));
             }
         in
         OpamPackage.Map.add key value map)
@@ -108,14 +110,12 @@ let load_package ~url pkg : Repo.loaded_package =
         let open Repo in
         let digest = "sha256:" ^ digest in
         Nix_expr.(
-          Dir
-            (Call
+          Opam_src.directory
+            (call
                [
-                 Id "repoPath";
-                 PropertyPath (Id "repos", [ Repo.repo_key pkg.repo; "src" ]);
-                 Attrs
-                   (AttrSet.of_list
-                      [ ("package", str pkg.rel_path); ("hash", str digest) ]);
+                 id "repoPath";
+                 property_path (id "repos") [ Repo.repo_key pkg.repo; "src" ];
+                 attrs [ ("package", str pkg.rel_path); ("hash", str digest) ];
                ])))
       (Repo.nix_digest_of_path (Repo.full_path pkg))
   in
@@ -131,11 +131,15 @@ let check_availability ~lookup_var pkg =
     if available then Ok pkg
     else
       let vars = OpamFilter.variables available_filter in
-      let vars_str =
-        (* FIXME: Do not do map + concat here *)
-        String.concat "/" (List.map OpamVariable.Full.to_string vars)
-      in
-      Error (Unavailable (Printf.sprintf "incompatible with %s" vars_str))
+      let open Format in
+      Error
+        (Unavailable
+           (asprintf "incompatible with %a"
+              (pp_print_list
+                 ~pp_sep:(fun ppf () -> pp_print_string ppf "/")
+                 (fun ppf e ->
+                   pp_print_string ppf (OpamVariable.Full.to_string e)))
+              vars))
   with e -> Error (Unavailable (Printexc.to_string e))
 
 module Context : Zi.S.CONTEXT with type t = universe = struct

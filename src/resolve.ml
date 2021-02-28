@@ -117,21 +117,19 @@ let setup_repo ~cache ~repos_base ~key spec : Repo.t Lwt.t =
              repo_digest = get_digest ~commit ();
            })
 
+let remove_quotes s = String.trim @@ Str.global_replace (Str.regexp "\"") "" s
+
+let detect_nixpkgs_ocaml_version () =
+  Log.debug "detecting current <nixpkgs> ocaml version@.";
+  Cmd.run_output_opt ~print:false
+    [ "nix-instantiate"; "--eval"; "--attr"; "ocaml.version"; "<nixpkgs>" ]
+  |> Lwt.map (Option.map remove_quotes)
+
 let setup_external_constraints ~repos_base ~repos ~detect_from ~ocaml_version
     ~cache : Solver.external_constraints Lwt.t =
-  let remove_quotes s =
-    s |> Str.global_replace (Str.regexp "\"") "" |> String.trim
-  in
-  let detect_nixpkgs_ocaml_version () =
-    Log.debug "detecting current <nixpkgs> ocaml version\n";
-    Cmd.run_output_opt ~print:false
-      [ "nix-instantiate"; "--eval"; "--attr"; "ocaml.version"; "<nixpkgs>" ]
-    |> Lwt.map (Option.map remove_quotes)
-  in
-
   let detect_ocaml_version () =
     if Sys.file_exists detect_from then (
-      Log.debug "detecting ocaml version from %s\n" detect_from;
+      Log.debug "detecting ocaml version from %s@." detect_from;
       let fullpath =
         if Filename.is_relative detect_from then
           Filename.concat (Unix.getcwd ()) detect_from
@@ -235,16 +233,14 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
   in
 
   Log.debug "Add downloaded packages (%d) " (List.length new_packages);
-  (* add downloaded packages *)
-  let selection = AttrSet.of_list new_packages in
 
   let attrs =
     [
-      ("format-version", Int 4);
-      ("repos", Id "repos");
+      ("format-version", _int 4);
+      ("repos", id "repos");
       ( "ocaml-version",
         str (external_constraints.ocaml_version |> Version.to_string) );
-      ("selection", Attrs selection);
+      ("selection", attrs new_packages);
     ]
   in
 
@@ -267,24 +263,23 @@ let write_solution ~external_constraints ~cache ~universe installed dest =
                        ("sha256", str (sha256 repo.repo_digest));
                      ] );
                  ( "src",
-                   Call [ Property (Id "pkgs", "fetchFromGitHub"); Id "fetch" ]
+                   call [ property (id "pkgs") "fetchFromGitHub"; id "fetch" ]
                  );
                ] ))
   in
 
   let expr : Nix_expr.t =
-    Function
-      ( Id "self",
-        Let_bindings
-          ( AttrSet.of_list
-              [
-                ("lib", Lit "self.lib");
-                ("pkgs", Lit "self.pkgs");
-                ("selection", Lit "self.selection");
-                ("repoPath", Lit "self.repoPath");
-                ("repos", Nix_expr.attrs repo_attrsets);
-              ],
-            Nix_expr.attrs attrs ) )
+    func (id "self")
+      (lets
+         (Nix_expr.attrset
+            [
+              ("lib", lit "self.lib");
+              ("pkgs", lit "self.pkgs");
+              ("selection", lit "self.selection");
+              ("repoPath", lit "self.repoPath");
+              ("repos", Nix_expr.attrs repo_attrsets);
+            ])
+         (Nix_expr.attrs attrs))
   in
   Lwt_main.run (Digest_cache.save cache);
   (* TODO write to temp file and rename *)
@@ -327,7 +322,7 @@ let main idx args =
       if OpamStd.String.Map.mem key !repo_specs then "Replacing" else "Adding"
     in
     Format.eprintf "%s repository: %s ...@." op key;
-    repo_specs := !repo_specs |> OpamStd.String.Map.add key spec
+    repo_specs := OpamStd.String.Map.add key spec !repo_specs
   in
 
   let direct_definitions = ref [] in
@@ -407,24 +402,25 @@ let main idx args =
     }
   in
 
-  let direct_requests = direct_requests |> List.map load_direct in
+  let direct_requests = List.map load_direct direct_requests in
   let direct_definitions =
-    direct_requests @ (!direct_definitions |> List.map load_direct)
+    direct_requests @ List.map load_direct !direct_definitions
   in
 
   let requested_packages =
-    repo_packages
-    |> List.map (fun spec ->
-           let relop_re = Str.regexp "[!<=>]+" in
-           Log.debug "Parsing spec %s\n" spec;
-           match Str.full_split relop_re spec with
-           | [ Str.Text name; Str.Delim relop; Str.Text ver ] ->
-               (* As of 20200906, we only support explicit versioning in cmdline specs *)
-               if String.equal relop "=" then
-                 (Name.of_string name, Some (OpamPackage.Version.of_string ver))
-               else failwith ("Unsupported version operator: " ^ relop)
-           | [ Str.Text name ] -> (OpamPackage.Name.of_string name, None)
-           | _ -> failwith ("Invalid version spec: " ^ spec))
+    let relop_re = Str.regexp "[!<=>]+" in
+    List.map
+      (fun spec ->
+        Log.debug "Parsing spec %s@." spec;
+        match Str.full_split relop_re spec with
+        | [ Str.Text name; Str.Delim relop; Str.Text ver ] ->
+            (* As of 20200906, we only support explicit versioning in cmdline specs *)
+            if String.equal relop "=" then
+              (Name.of_string name, Some (OpamPackage.Version.of_string ver))
+            else failwith ("Unsupported version operator: " ^ relop)
+        | [ Str.Text name ] -> (OpamPackage.Name.of_string name, None)
+        | _ -> failwith ("Invalid version spec: " ^ spec))
+      repo_packages
   in
 
   let config_base = Filename.concat (Unix.getenv "HOME") ".cache/opam2nix" in
@@ -466,12 +462,13 @@ let main idx args =
   in
 
   let package_names : OpamPackage.Name.t list =
-    requested_packages |> List.map fst
+    List.map fst requested_packages
   in
   let constrained_versions =
-    requested_packages
-    |> List.filter_map (fun (name, version) ->
-           version |> Option.map (fun version -> (name, version)))
+    List.filter_map
+      (fun (name, version) ->
+        version |> Option.map (fun version -> (name, version)))
+      requested_packages
   in
 
   let universe =
